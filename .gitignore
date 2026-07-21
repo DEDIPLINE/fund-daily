@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project data (generated, do not track)
+data/history/
+data/reports/
+data/dashboard.json
+
+# Config with personal data (use config.example.json instead)
+portfolio.json
+
+# Scratch / temp
+*.tmp
+*.log

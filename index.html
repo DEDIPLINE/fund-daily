@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 基金助手</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .nav-item { transition: all 0.15s ease; }
+    .nav-item:hover { background: rgba(255,255,255,0.05); }
+    .nav-item.active { background: rgba(255,255,255,0.1); border-left: 3px solid #ef4444; }
+    .view-enter { animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .card-hover { transition: box-shadow 0.15s ease; }
+    .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .spark-line { stroke-dasharray: 300; stroke-dashoffset: 300; animation: drawLine 1s ease forwards; }
+    @keyframes drawLine { to { stroke-dashoffset: 0; } }
+  </style>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            up: '#ef4444',       // 涨 = 红
+            down: '#22c55e',     // 跌 = 绿
+            flat: '#6b7280',
+            dark: { 800: '#1e293b', 700: '#334155', 600: '#475569', 500: '#64748b' },
+            accent: { DEFAULT: '#3b82f6', light: '#60a5fa' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="dark bg-slate-900 text-slate-200 min-h-screen" x-data="app()" x-init="initCharts()" x-cloak>
+
+  <!-- 顶部导航栏 -->
+  <header class="fixed top-0 left-0 right-0 h-14 bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 z-50 flex items-center justify-between px-4">
+    <div class="flex items-center gap-3">
+      <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden p-1.5 rounded-lg hover:bg-slate-700/50">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center text-white text-sm font-bold">F</div>
+        <span class="font-semibold text-white text-base hidden sm:block">AI 基金助手</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-slate-400" x-text="currentDate"></span>
+      <button class="px-3 py-1.5 text-xs bg-slate-700/50 hover:bg-slate-700 rounded-lg transition text-slate-300">
+        刷新数据
+      </button>
+    </div>
+  </header>
+
+  <div class="flex pt-14">
+    <!-- 侧边栏 -->
+    <aside class="fixed lg:static top-14 bottom-0 left-0 z-40 w-56 bg-slate-800/50 border-r border-slate-700/50 overflow-y-auto transition-transform lg:translate-x-0"
+           :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
+      <nav class="p-3 space-y-1">
+        <template x-for="(item, idx) in navItems" :key="idx">
+          <button @click="currentView = item.id; sidebarOpen = false"
+                  class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left"
+                  :class="currentView === item.id ? 'active bg-white/10 text-white' : 'text-slate-400'">
+            <span class="text-base" x-text="item.icon"></span>
+            <span x-text="item.label"></span>
+            <span x-show="item.badge" class="ml-auto text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full" x-text="item.badge"></span>
+          </button>
+        </template>
+      </nav>
+
+      <!-- 底部持仓概览 -->
+      <div class="absolute bottom-0 left-0 right-0 p-3 border-t border-slate-700/50 bg-slate-800/80">
+        <div class="text-[10px] text-slate-500 mb-1">持仓总市值</div>
+        <div class="text-lg font-semibold text-white" x-text="'¥' + totalAmount.toLocaleString()"></div>
+        <div class="text-xs mt-0.5" :class="totalPnl >= 0 ? 'text-up' : 'text-down'"
+             x-text="(totalPnl >= 0 ? '+' : '') + totalPnl.toFixed(2) + ' 元 (' + ((totalPnl/totalAmount)*100).toFixed(2) + '%)'"></div>
+      </div>
+    </aside>
+
+    <!-- 遮罩层（移动端） -->
+    <div x-show="sidebarOpen" @click="sidebarOpen = false" class="fixed inset-0 bg-black/50 z-30 lg:hidden" x-transition.opacity></div>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 min-h-[calc(100vh-3.5rem)] p-4 lg:p-6 overflow-x-hidden">
+
+      <!-- ====== 视图1：每日日报 ====== -->
+      <div x-show="currentView === 'daily'" class="view-enter">
+        <h2 class="text-xl font-semibold text-white mb-4">每日收盘日报</h2>
+
+        <!-- 总览卡片 -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <div class="bg-slate-800 rounded-xl p-4 card-hover">
+            <div class="text-xs text-slate-400">持仓总市值</div>
+            <div class="text-xl font-bold text-white mt-1" x-text="'¥' + totalAmount.toLocaleString()"></div>
+          </div>
+          <div class="bg-slate-800 rounded-xl p-4 card-hover">
+            <div class="text-xs text-slate-400">最新净值日盈亏</div>
+            <div class="text-xl font-bold mt-1" :class="totalPnl >= 0 ? 'text-up' : 'text-down'"
+                 x-text="(totalPnl >= 0 ? '+' : '') + totalPnl.toFixed(2)"></div>
+          </div>
+          <div class="bg-slate-800 rounded-xl p-4 card-hover">
+            <div class="text-xs text-slate-400">今日预估盈亏</div>
+            <div class="text-xl font-bold mt-1" :class="estPnl >= 0 ? 'text-up' : 'text-down'"
+                 x-text="(estPnl >= 0 ? '+' : '') + estPnl.toFixed(2)"></div>
+          </div>
+          <div class="bg-slate-800 rounded-xl p-4 card-hover">
+            <div class="text-xs text-slate-400">今日预估涨幅</div>
+            <div class="text-xl font-bold mt-1" :class="estPct >= 0 ? 'text-up' : 'text-down'"
+                 x-text="(estPct >= 0 ? '+' : '') + estPct.toFixed(2) + '%'"></div>
+          </div>
+        </div>
+
+        <!-- 信号总览 -->
+        <div class="flex gap-2 mb-5 flex-wrap">
+          <div class="bg-slate-800 rounded-lg px-4 py-2 text-center min-w-[80px]">
+            <div class="text-[10px] text-slate-500">过热(红)</div>
+            <div class="text-lg font-bold text-up" x-text="signals.red"></div>
+          </div>
+          <div class="bg-slate-800 rounded-lg px-4 py-2 text-center min-w-[80px]">
+            <div class="text-[10px] text-slate-500">中性(黄)</div>
+            <div class="text-lg font-bold text-yellow-400" x-text="signals.yellow"></div>
+          </div>
+          <div class="bg-slate-800 rounded-lg px-4 py-2 text-center min-w-[80px]">
+            <div class="text-[10px] text-slate-500">低估(绿)</div>
+            <div class="text-lg font-bold text-down" x-text="signals.green"></div>
+          </div>
+          <div class="bg-slate-800 rounded-lg px-4 py-2 text-center min-w-[80px]">
+            <div class="text-[10px] text-slate-500">止盈触发</div>
+            <div class="text-lg font-bold text-up" x-text="signals.tp"></div>
+          </div>
+          <div class="bg-slate-800 rounded-lg px-4 py-2 text-center min-w-[80px]">
+            <div class="text-[10px] text-slate-500">异动预警</div>
+            <div class="text-lg font-bold text-yellow-400" x-text="signals.anomaly"></div>
+          </div>
+        </div>
+
+        <!-- 持仓表格 -->
+        <div class="bg-slate-800 rounded-xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-slate-700">
+                  <th class="px-3 py-3 text-left text-xs text-slate-400 font-medium">基金</th>
+                  <th class="px-3 py-3 text-right text-xs text-slate-400 font-medium">市值</th>
+                  <th class="px-3 py-3 text-right text-xs text-slate-400 font-medium">最新净值</th>
+                  <th class="px-3 py-3 text-right text-xs text-slate-400 font-medium">日涨跌</th>
+                  <th class="px-3 py-3 text-right text-xs text-slate-400 font-medium">预估涨幅</th>
+                  <th class="px-3 py-3 text-center text-xs text-slate-400 font-medium">信号</th>
+                  <th class="px-3 py-3 text-center text-xs text-slate-400 font-medium">走势</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="h in holdings" :key="h.code">
+                  <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                    <td class="px-3 py-3">
+                      <div class="font-medium text-white" x-text="h.code"></div>
+                      <div class="text-xs text-slate-500" x-text="h.shortName"></div>
+                    </td>
+                    <td class="px-3 py-3 text-right font-mono" x-text="'¥' + h.amount.toLocaleString()"></td>
+                    <td class="px-3 py-3 text-right font-mono">
+                      <span x-text="h.nav || '—'"></span>
+                      <span x-show="h.lag" class="text-[10px] bg-yellow-500/20 text-yellow-400 px-1 py-0.5 rounded ml-1">滞后</span>
+                    </td>
+                    <td class="px-3 py-3 text-right font-mono font-semibold"
+                        :class="h.pct >= 0 ? 'text-up' : 'text-down'"
+                        x-text="(h.pct >= 0 ? '+' : '') + (h.pct || 0).toFixed(2) + '%'"></td>
+                    <td class="px-3 py-3 text-right font-mono"
+                        :class="h.estPct >= 0 ? 'text-up' : 'text-down'"
+                        x-text="h.estPct != null ? ((h.estPct >= 0 ? '+' : '') + h.estPct.toFixed(2) + '%') : '—'"></td>
+                    <td class="px-3 py-3 text-center">
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                            :class="{
+                              'bg-red-500/20 text-red-400': h.light === 'red',
+                              'bg-yellow-500/20 text-yellow-400': h.light === 'yellow',
+                              'bg-green-500/20 text-green-400': h.light === 'green',
+                              'bg-slate-700 text-slate-400': !h.light
+                            }">
+                        <span class="w-1.5 h-1.5 rounded-full"
+                              :class="{
+                                'bg-red-400': h.light === 'red',
+                                'bg-yellow-400': h.light === 'yellow',
+                                'bg-green-400': h.light === 'green',
+                                'bg-slate-500': !h.light
+                              }"></span>
+                        <span x-text="h.lightLabel || '—'"></span>
+                      </span>
+                    </td>
+                    <td class="px-3 py-3">
+                      <svg width="100" height="24" viewBox="0 0 100 24" class="mx-auto">
+                        <polyline fill="none" stroke-width="1.5" stroke-linecap="round"
+                                  :stroke="h.pct >= 0 ? '#ef4444' : '#22c55e'"
+                                  :points="h.sparkPoints || ''"/>
+                      </svg>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== 视图2：消息面 ====== -->
+      <div x-show="currentView === 'news'" class="view-enter">
+        <h2 class="text-xl font-semibold text-white mb-4">📰 消息面参考卡</h2>
+
+        <!-- 持仓新闻区 -->
+        <div class="mb-6">
+          <h3 class="text-sm font-medium text-slate-400 mb-3 border-l-2 border-accent pl-3">📌 持仓消息</h3>
+          <div class="grid gap-3 md:grid-cols-2">
+            <template x-for="n in newsItems.slice(0, 6)" :key="n.title">
+              <div class="bg-slate-800 rounded-xl p-4 card-hover border-l-2 border-accent/50">
+                <div class="flex items-start justify-between gap-2 mb-2">
+                  <h4 class="text-sm font-medium text-white leading-snug" x-text="n.title"></h4>
+                </div>
+                <p class="text-xs text-slate-400 line-clamp-2 mb-2" x-text="n.summary"></p>
+                <div class="flex items-center gap-2 text-[10px] text-slate-500">
+                  <span x-text="n.source"></span>
+                  <span>·</span>
+                  <span x-text="n.time"></span>
+                  <span>·</span>
+                  <span class="text-accent-light" x-text="n.tag"></span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 市场热点 -->
+        <div class="mb-6">
+          <h3 class="text-sm font-medium text-slate-400 mb-3 border-l-2 border-orange-500 pl-3">🔥 市场热点</h3>
+          <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            <template x-for="h in hotStocks" :key="h.name">
+              <div class="bg-slate-800 rounded-xl p-4 card-hover">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-sm font-semibold text-white" x-text="h.name"></span>
+                  <span class="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-400"
+                        :class="h.change >= 0 ? 'text-up' : 'text-down'"
+                        x-text="(h.change >= 0 ? '+' : '') + h.change.toFixed(2) + '%'"></span>
+                </div>
+                <div class="text-xs text-slate-500" x-text="'关注度 ' + h.followers.toLocaleString()"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 宏观日历 -->
+        <div>
+          <h3 class="text-sm font-medium text-slate-400 mb-3 border-l-2 border-down pl-3">🌐 宏观经济</h3>
+          <div class="bg-slate-800 rounded-xl overflow-hidden">
+            <template x-for="m in macroEvents.slice(0, 8)" :key="m.event">
+              <div class="flex items-center gap-3 px-4 py-2.5 border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30">
+                <span class="text-xs" x-text="m.importance >= 3 ? '🔴' : (m.importance >= 2 ? '🟡' : '⚪')"></span>
+                <span class="text-xs text-slate-500 w-12" x-text="m.time"></span>
+                <span class="text-xs text-slate-500 w-8" x-text="m.region"></span>
+                <span class="text-sm text-white flex-1" x-text="m.event"></span>
+                <span class="text-sm font-medium text-right w-16" x-text="m.actual"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== 视图3：诊断 ====== -->
+      <div x-show="currentView === 'diagnosis'" class="view-enter">
+        <h2 class="text-xl font-semibold text-white mb-4">🩺 持仓诊断</h2>
+
+        <!-- 风险指标卡片 -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <div class="bg-slate-800 rounded-xl p-4 card-hover">
+            <div class="text-xs text-slate-400">年化波动率</div>
+            <div class="text-xl font-bold text-white mt-1" x-text="diag.volatility + '%'"></div>
+          </div>
+          <div class="bg-slate-800 rounded-xl p-4 card-hover">
+            <div class="text-xs text-slate-400">最大回撤</div>
+            <div class="text-xl font-bold text-down mt-1" x-text="diag.mdd + '%'"></div>
+          </div>
+          <div class="bg-slate-800 rounded-xl p-4 card-hover">
+            <div class="text-xs text-slate-400">夏普比率</div>
+            <div class="text-xl font-bold text-white mt-1" x-text="diag.sharpe"></div>
+          </div>
+          <div class="bg-slate-800 rounded-xl p-4 card-hover">
+            <div class="text-xs text-slate-400">HHI 集中度</div>
+            <div class="text-xl font-bold mt-1" :class="diag.hhi > 0.15 ? 'text-up' : 'text-white'" x-text="diag.hhi"></div>
+          </div>
+        </div>
+
+        <!-- 分类占比 + 基准对比 -->
+        <div class="grid md:grid-cols-2 gap-4 mb-5">
+          <div class="bg-slate-800 rounded-xl p-4">
+            <h3 class="text-sm font-medium text-slate-400 mb-3">分类占比</h3>
+            <div id="chart-category" style="height: 240px;"></div>
+          </div>
+          <div class="bg-slate-800 rounded-xl p-4">
+            <h3 class="text-sm font-medium text-slate-400 mb-3">与基准对比</h3>
+            <div id="chart-benchmark" style="height: 240px;"></div>
+          </div>
+        </div>
+
+        <!-- 偏散热力图 -->
+        <div class="bg-slate-800 rounded-xl p-4">
+          <h3 class="text-sm font-medium text-slate-400 mb-3">⚠️ 假分散预警（相关性 > 0.70）</h3>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="p in corrWarnings" :key="p.pair">
+              <div class="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-sm">
+                <span class="text-red-400 font-medium" x-text="p.pair"></span>
+                <span class="text-slate-400 mx-1">相关性</span>
+                <span class="text-red-400 font-mono" x-text="p.value"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== 视图4：信号总览 ====== -->
+      <div x-show="currentView === 'signals'" class="view-enter">
+        <h2 class="text-xl font-semibold text-white mb-4">🚦 信号总览</h2>
+
+        <!-- 红绿灯分布 -->
+        <div class="grid grid-cols-3 gap-3 mb-5">
+          <div class="bg-slate-800 rounded-xl p-5 text-center card-hover">
+            <div class="text-3xl font-bold text-up" x-text="signals.red"></div>
+            <div class="text-xs text-slate-400 mt-1">过热（红灯）</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">净值处于近1年高位</div>
+          </div>
+          <div class="bg-slate-800 rounded-xl p-5 text-center card-hover">
+            <div class="text-3xl font-bold text-yellow-400" x-text="signals.yellow"></div>
+            <div class="text-xs text-slate-400 mt-1">中性（黄灯）</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">净值处于中间区间</div>
+          </div>
+          <div class="bg-slate-800 rounded-xl p-5 text-center card-hover">
+            <div class="text-3xl font-bold text-down" x-text="signals.green"></div>
+            <div class="text-xs text-slate-400 mt-1">低估（绿灯）</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">净值处于近1年低位</div>
+          </div>
+        </div>
+
+        <!-- 信号详情表 -->
+        <div class="bg-slate-800 rounded-xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-slate-700">
+                  <th class="px-3 py-3 text-left text-xs text-slate-400 font-medium">基金</th>
+                  <th class="px-3 py-3 text-center text-xs text-slate-400 font-medium">红绿灯</th>
+                  <th class="px-3 py-3 text-right text-xs text-slate-400 font-medium">近1年涨幅</th>
+                  <th class="px-3 py-3 text-center text-xs text-slate-400 font-medium">信号</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="h in holdings" :key="h.code">
+                  <tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
+                    <td class="px-3 py-3">
+                      <div class="font-medium text-white" x-text="h.shortName || h.code"></div>
+                    </td>
+                    <td class="px-3 py-3 text-center">
+                      <span class="w-3 h-3 rounded-full inline-block"
+                            :class="{
+                              'bg-up': h.light === 'red',
+                              'bg-yellow-400': h.light === 'yellow',
+                              'bg-down': h.light === 'green',
+                              'bg-slate-600': !h.light
+                            }"></span>
+                    </td>
+                    <td class="px-3 py-3 text-right font-mono"
+                        :class="h.gain >= 0 ? 'text-up' : 'text-down'"
+                        x-text="(h.gain >= 0 ? '+' : '') + (h.gain || 0).toFixed(1) + '%'"></td>
+                    <td class="px-3 py-3 text-center">
+                      <span x-show="h.tpTier > 0" class="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-medium"
+                            x-text="'止盈' + h.tpTier + '档'"></span>
+                      <span x-show="h.anomaly" class="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full font-medium ml-1">异动</span>
+                      <span x-show="!h.tpTier && !h.anomaly" class="text-slate-600 text-xs">—</span>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部免责声明 -->
+      <div class="mt-6 text-xs text-slate-600 border-l-2 border-slate-700 pl-3 py-2">
+        ⚠️ 本工具仅做数据跟踪与可视化，<b>不构成任何投资建议</b>。基金有风险，投资须谨慎。
+      </div>
+    </main>
+  </div>
+
+  <script>
+    async function loadData() {
+      try {
+        const resp = await fetch('data/dashboard.json');
+        if (resp.ok) return await resp.json();
+      } catch(e) {}
+      return null;
+    }
+
+    function app() {
+      const fallback = {
+        sidebarOpen: false,
+        currentView: 'daily',
+        currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }),
+        navItems: [
+          { id: 'daily', label: '每日日报', icon: '📊', badge: null },
+          { id: 'news', label: '消息面', icon: '📰', badge: 'NEW' },
+          { id: 'diagnosis', label: '持仓诊断', icon: '🩺', badge: null },
+          { id: 'signals', label: '信号总览', icon: '🚦', badge: null },
+        ],
+        totalAmount: 4382.59,
+        totalPnl: -88.10,
+        estPnl: 208.45,
+        estPct: 4.76,
+        signals: { red: 3, yellow: 6, green: 3, tp: 7, anomaly: 7 },
+        diag: { volatility: '23.1', mdd: '-15.9', sharpe: '1.24', hhi: '0.161' },
+        corrWarnings: [
+          { pair: '碳中和 ↔ 机器人', value: '0.867' },
+          { pair: '芯片 ↔ 数字经济', value: '0.736' },
+        ],
+        holdings: [
+          { code: '014194', shortName: '芯片指增C', amount: 986.63, nav: '1.2345', pct: -2.15, estPct: 12.07, light: 'red', lightLabel: '过热', gain: 132.0, tpTier: 25, anomaly: false, pctRank: 88, sparkPoints: '2,20 12,18 22,16 32,14 42,10 52,8 62,5 72,3 82,4 92,2' },
+          { code: '016531', shortName: '碳中和C', amount: 886.02, nav: '0.8765', pct: -1.80, estPct: 3.45, light: 'green', lightLabel: '低估', gain: -15.2, tpTier: 0, anomaly: true, pctRank: 15, sparkPoints: '2,5 12,8 22,12 32,15 42,18 52,20 62,19 72,18 82,20 92,22' },
+          { code: '000218', shortName: '黄金ETF联接A', amount: 759.44, nav: '1.5678', pct: 0.06, estPct: 1.60, light: 'yellow', lightLabel: '中性', gain: 45.7, tpTier: 25, anomaly: false, pctRank: 49, sparkPoints: '2,15 12,14 22,12 32,10 42,8 52,6 62,5 72,4 82,3 92,2' },
+          { code: '400015', shortName: '新能源混合', amount: 714.95, nav: '2.3456', pct: -0.43, estPct: 4.00, light: 'green', lightLabel: '低估', gain: -8.5, tpTier: 0, anomaly: false, pctRank: 18, sparkPoints: '2,10 12,12 22,14 32,16 42,18 52,17 62,19 72,20 82,21 92,22' },
+          { code: '270042', shortName: '纳指100QDII', amount: 430.71, nav: '3.4567', pct: -1.20, estPct: 0.04, light: 'red', lightLabel: '过热', gain: 28.3, tpTier: 20, anomaly: false, pctRank: 81, sparkPoints: '2,5 12,6 22,4 32,3 42,5 52,4 62,3 72,2 82,3 92,2' },
+          { code: '018229', shortName: '全球优质QDII', amount: 88.16, nav: '1.1234', pct: -0.80, estPct: null, light: 'red', lightLabel: '过热', gain: 22.1, tpTier: 20, anomaly: false, pctRank: 78, lag: true, sparkPoints: '2,8 12,7 22,6 32,5 42,6 52,5 62,4 72,3 82,4 92,3' },
+          { code: '017102', shortName: '数字经济A', amount: 84.88, nav: '0.9876', pct: 1.50, estPct: 5.20, light: 'yellow', lightLabel: '中性', gain: 12.8, tpTier: 15, anomaly: false, pctRank: 55, sparkPoints: '2,12 12,11 22,10 32,9 42,8 52,7 62,6 72,5 82,4 92,3' },
+          { code: '020607', shortName: '机器人ETF联接A', amount: 82.07, nav: '0.7654', pct: 3.20, estPct: 6.80, light: 'green', lightLabel: '低估', gain: -5.2, tpTier: 0, anomaly: true, pctRank: 12, sparkPoints: '2,18 12,16 22,17 32,15 42,16 52,18 62,20 72,19 82,21 92,20' },
+          { code: '023638', shortName: '电网设备ETF联接A', amount: 78.34, nav: '1.0123', pct: -0.50, estPct: 2.10, light: 'yellow', lightLabel: '中性', gain: 8.5, tpTier: 15, anomaly: false, pctRank: 45, sparkPoints: '2,10 12,9 22,11 32,10 42,9 52,8 62,9 72,10 82,11 92,10' },
+          { code: '016185', shortName: '电力公用ETF联接A', amount: 103.59, nav: '1.2345', pct: -0.30, estPct: null, light: 'yellow', lightLabel: '中性', gain: 5.2, tpTier: 0, anomaly: false, pctRank: 42, lag: true, sparkPoints: '2,8 12,9 22,10 32,9 42,8 52,7 62,8 72,9 82,10 92,9' },
+          { code: '008173', shortName: '稳泰债券C', amount: 101.92, nav: '1.0567', pct: 0.02, estPct: 0.03, light: null, lightLabel: '—', gain: 2.1, tpTier: 0, anomaly: false, pctRank: null, sparkPoints: '2,12 12,11 22,10 32,9 42,8 52,7 62,6 72,5 82,4 92,3' },
+          { code: '240022', shortName: '资源优选混合A', amount: 65.88, nav: '4.659', pct: 0.15, estPct: 3.08, light: 'yellow', lightLabel: '中性', gain: 28.5, tpTier: 25, anomaly: false, pctRank: 25, sparkPoints: '2,14 12,12 22,13 32,11 42,12 52,10 62,11 72,9 82,10 92,8' },
+        ],
+        newsItems: [
+          { title: '中国国新、中国诚通斥资600亿元托市后，A股强劲反弹！', summary: '拆解两大国资历史投资图谱：聚焦电子和通信行业。', source: '腾讯自选股', time: '21:13', tag: '市场' },
+          { title: '硬撼英特尔，中芯没有光刻机也能手搓成熟7nm', summary: 'Semianalysis拆解麒麟9030，中芯国际7nm工艺取得突破性进展。', source: '腾讯自选股', time: '17:29', tag: '芯片' },
+          { title: '钠电最大订单落地！宁德时代5GWh撬动欧洲储能市场', summary: '宁德时代钠电池获得欧洲大单，标志着钠电商业化进程加速。', source: '腾讯自选股', time: '20:20', tag: '新能源' },
+          { title: '山东黄金中期利润分配：拟每10股派发现金红利1元', summary: '预计总派发金额为4.61亿元，占扣除永续债利息后归母净利润的34.84%。', source: '财中社', time: '17:51', tag: '黄金' },
+          { title: '7月21日科创板主力资金净流入91.95亿元', summary: '中芯国际主力资金净流入14亿元，寒武纪净流入11.5亿元。', source: '证券时报网', time: '16:49', tag: '芯片' },
+          { title: '宁德时代与Solarpro签署2GWh合作协议', summary: '宁德时代持续拓展海外市场，与保加利亚Solarpro签署储能合作协议。', source: '腾讯自选股', time: '21:07', tag: '新能源' },
+        ],
+        hotStocks: [
+          { name: '赛力斯', change: 3.21, followers: 68549 },
+          { name: '格力电器', change: 1.85, followers: 39235 },
+          { name: '胜宏科技', change: 5.67, followers: 30679 },
+          { name: '新易盛', change: 8.19, followers: 29769 },
+          { name: '药明康德', change: -2.10, followers: 29251 },
+        ],
+        macroEvents: [
+          { time: '06:30', region: '美国', event: '美国7月20日SPDR黄金持仓', actual: '1003.59吨', importance: 2 },
+          { time: '06:30', region: '美国', event: '美国7月20日iShares白银持仓', actual: '15052.89吨', importance: 2 },
+          { time: '06:30', region: '美国', event: '美国7月20日iShares黄金持仓变动', actual: '-0.47吨', importance: 1 },
+          { time: '06:30', region: '美国', event: '美国7月17日NYMEX钯金库存', actual: '2336百盎司', importance: 1 },
+          { time: '06:30', region: '美国', event: '美国7月20日iShares黄金持仓', actual: '460.89吨', importance: 2 },
+          { time: '10:00', region: '中国', event: '中国6月LPR报价', actual: '3.10%', importance: 3 },
+        ],
+        initCharts() {
+          this.$watch('currentView', (val) => {
+            if (val === 'diagnosis') {
+              this.$nextTick(() => this.renderDiagCharts());
+            }
+          });
+        },
+        renderDiagCharts() {
+          // 分类占比饼图
+          const catEl = document.getElementById('chart-category');
+          if (catEl && !catEl._chart) {
+            const chart = echarts.init(catEl, 'dark');
+            catEl._chart = chart;
+            chart.setOption({
+              backgroundColor: 'transparent',
+              tooltip: { trigger: 'item', formatter: '{b}: {c}元 ({d}%)' },
+              series: [{
+                type: 'pie', radius: ['40%', '70%'], center: ['50%', '50%'],
+                itemStyle: { borderRadius: 6, borderColor: '#1e293b', borderWidth: 2 },
+                label: { color: '#94a3b8', fontSize: 11 },
+                data: [
+                  { value: 986.63, name: '半导体/芯片', itemStyle: { color: '#ef4444' } },
+                  { value: 886.02, name: '碳中和/制造', itemStyle: { color: '#3b82f6' } },
+                  { value: 759.44, name: '黄金', itemStyle: { color: '#eab308' } },
+                  { value: 714.95, name: '新能源/汽车', itemStyle: { color: '#22c55e' } },
+                  { value: 518.87, name: 'QDII', itemStyle: { color: '#a855f7' } },
+                  { value: 84.88, name: '数字经济', itemStyle: { color: '#06b6d4' } },
+                  { value: 160.41, name: '机器人/电网/电力', itemStyle: { color: '#f97316' } },
+                  { value: 101.92, name: '债券/避险', itemStyle: { color: '#64748b' } },
+                  { value: 65.88, name: '资源/周期', itemStyle: { color: '#8b5cf6' } },
+                ]
+              }]
+            });
+          }
+          // 基准对比柱状图
+          const benchEl = document.getElementById('chart-benchmark');
+          if (benchEl && !benchEl._chart) {
+            const chart2 = echarts.init(benchEl, 'dark');
+            benchEl._chart = chart2;
+            chart2.setOption({
+              backgroundColor: 'transparent',
+              tooltip: { trigger: 'axis' },
+              xAxis: { type: 'category', data: ['组合', '沪深300', '国债指数'], axisLabel: { color: '#94a3b8' }, axisLine: { lineStyle: { color: '#334155' } } },
+              yAxis: [
+                { type: 'value', name: '夏普/年化', axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: '#1e293b' } } },
+              ],
+              series: [
+                { name: '夏普比率', type: 'bar', barWidth: 30, data: [1.24, 0.65, 0.88], itemStyle: { color: '#3b82f6', borderRadius: [4,4,0,0] } },
+                { name: '年化波动率%', type: 'bar', barWidth: 30, data: [23.1, 17.0, 0.78], itemStyle: { color: '#ef4444', borderRadius: [4,4,0,0] } },
+              ],
+              legend: { textStyle: { color: '#94a3b8', fontSize: 11 }, top: 0 }
+            });
+          }
+        },
+      };
+      // Try loading real data from dashboard.json
+      const data = await loadData();
+      if (data) {
+        const s = data.summary || {};
+        const fb = fallback;
+        return {
+          ...fb,
+          sidebarOpen: false,
+          currentView: 'daily',
+          currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }),
+          totalAmount: s.totalAmount || fb.totalAmount,
+          totalPnl: s.totalPnl || fb.totalPnl,
+          estPnl: s.estPnl || fb.estPnl,
+          estPct: s.estPct || fb.estPct,
+          signals: s.signals || fb.signals,
+          holdings: data.holdings || fb.holdings,
+          macroEvents: data.macroEvents && data.macroEvents.length ? data.macroEvents : fb.macroEvents,
+        };
+      }
+      return { ...fallback, sidebarOpen: false, currentView: 'daily',
+        currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }) };
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "meta": {
+    "owner": "你的名字",
+    "platform": "支付宝",
+    "currency": "CNY",
+    "snapshot_date": "2026-01-01",
+    "note": "持仓金额为该日期的市值(元)。数据来自截图，需手动维护。QDII基金净值通常有1-2个交易日滞后。"
+  },
+  "signals": {
+    "valuation_window": 252,
+    "valuation_high": 80,
+    "valuation_low": 20,
+    "take_profit_baseline": "2025-01-01",
+    "take_profit_tiers": [15, 20, 25],
+    "anomaly_drop_pct": 3.0,
+    "anomaly_consecutive_down": 3,
+    "note": "方案B口径：未提供真实成本，止盈用近1年涨幅(基准日)近似。改 take_profit_baseline 可改为特定日期或提供成本后切方案A。"
+  },
+  "diagnostics": {
+    "rf": 0.015,
+    "single_limit": 25.0,
+    "bucket_limit": 40.0,
+    "hhi_limit": 0.15,
+    "corr_limit": 0.70,
+    "benchmark": ["000300", "000012"],
+    "benchmark_names": {"000300": "沪深300", "000012": "上证国债指数"},
+    "note": "诊断阈值：单只>25%/风险桶>40%/HHI>0.15/相关性>0.70 触发提示。"
+  },
+  "news": {
+    "hot_stocks_count": 5,
+    "news_per_stock": 5,
+    "research_days": 7,
+    "fund_announcement_days": 7,
+    "macro_keywords": ["黄金", "白银", "原油", "美元", "人民币", "PMI", "GDP", "CPI", "降息", "加息", "利率", "LPR"],
+    "note": "hot_stocks_count: 市场热点区取非持仓关联的雪球热度Top几只; news_per_stock: 每只关联股票拉几条新闻"
+  },
+  "theme_map": {
+    "YOUR_FUND_CODE_1": {
+      "stocks": ["SH600000"],
+      "stock_names": ["示例股票"],
+      "keywords": ["关键词1", "关键词2"],
+      "note": "每只基金→关联龙头股票代码+行业关键词"
+    }
+  },
+  "holdings": [
+    {
+      "code": "YOUR_FUND_CODE",
+      "name": "你的基金名称",
+      "type": "股票型-行业指数",
+      "category": "行业分类",
+      "amount": 0
+    }
+  ]
+}
