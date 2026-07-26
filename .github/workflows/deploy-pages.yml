@@ -31,11 +31,24 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           # 只上传静态文件，排除 Python 代码和数据目录（数据通过 update-data 工作流更新）
-          path: |
-            index.html
-            data
-            README.md
+          path: .
+          # 排除不需要的文件和目录
+          exclude: |
+            .git
+            .github
+            *.py
+            src/
+            tests/
+            __pycache__/
+            .pytest_cache/
+            *.md
             LICENSE
+            Dockerfile
+            HF_SPACES_DEPLOY.md
+            GITHUB_PAGES_DEPLOY.md
+            config.example.json
+            portfolio.json
+            .gitignore
             
       - name: Deploy to GitHub Pages
         id: deployment
