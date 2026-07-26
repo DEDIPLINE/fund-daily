@@ -33,7 +33,7 @@ jobs:
           # 只上传静态文件，排除 Python 代码和数据目录（数据通过 update-data 工作流更新）
           path: |
             index.html
-            data/
+            data
             README.md
             LICENSE
             
