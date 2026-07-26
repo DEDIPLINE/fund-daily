@@ -1,3 +1,7 @@
 akshare>=1.18.66
 pandas>=1.5.0
 numpy>=1.23.0
+flask>=3.0.0
+apscheduler>=3.10.0
+huggingface_hub>=0.20.0
+requests>=2.31.0

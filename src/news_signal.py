@@ -1,13 +1,19 @@
 # -*- coding: utf-8 -*-
 """
 M5 · 每日消息面参考卡 — 消息面/舆情聚合
-数据层（akshare 1.18.66）：
-  - stock_news_em：个股新闻（按 theme_map 关联股票拉取，每股 ~10 条）
+数据层（双源：腾讯自选股 MCP / akshare 1.18.66）：
+  - 个股新闻：MCP data_news (type=2) 优先 → akshare stock_news_em fallback
   - news_economic_baidu：宏观经济日历（按日期，按关键词过滤）
   - stock_research_report_em：机构研报（近 N 天）
   - stock_js_weibo_report：微博情绪系数（按关联股票匹配）
   - stock_hot_tweet_xq：雪球热度榜（过滤持仓关联股 → Top 非持仓热门股）
   - fund_announcement_report_em：基金公告（近 N 天）
+
+MCP 缓存机制：
+  - MCP 工具仅在 WorkBuddy 环境中可调用，Python 脚本通过缓存文件读取
+  - 缓存路径：data/mcp_news_cache.json
+  - 缓存有效期：当天（按日期判断）
+  - 缓存过期或不存在时，自动降级到 akshare
 
 输出：data/reports/news_YYYYMMDD.html
 运行：python src/news_signal.py
@@ -28,6 +34,7 @@ import akshare as ak
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORTFOLIO = os.path.join(ROOT, "portfolio.json")
 REPORT_DIR = os.path.join(ROOT, "data", "reports")
+MCP_CACHE_PATH = os.path.join(ROOT, "data", "mcp_news_cache.json")
 os.makedirs(REPORT_DIR, exist_ok=True)
 
 UP_COLOR = "#d40000"
@@ -40,17 +47,74 @@ def load_portfolio():
         return json.load(f)
 
 
+# ── MCP 缓存管理 ──────────────────────────────────────────────
+
+def to_mcp_symbol(stock_code):
+    """裸代码转 MCP symbol：6/9 开头→sh，0/3 开头→sz。"""
+    code = str(stock_code).strip()
+    if code[0] in ("6", "9"):
+        return f"sh{code}"
+    elif code[0] in ("0", "3"):
+        return f"sz{code}"
+    return f"sh{code}"
+
+
+def load_mcp_cache():
+    """加载 MCP 新闻缓存，过期则返回 None。"""
+    if not os.path.exists(MCP_CACHE_PATH):
+        return None
+    try:
+        with open(MCP_CACHE_PATH, encoding="utf-8") as f:
+            cache = json.load(f)
+        cache_date = cache.get("date", "")
+        today = datetime.date.today().strftime("%Y-%m-%d")
+        if cache_date != today:
+            print(f"  ℹ️ MCP 缓存过期（{cache_date}），降级到 akshare")
+            return None
+        return cache
+    except Exception:
+        return None
+
+
+def get_mcp_news_for_stock(mcp_cache, stock_code):
+    """从 MCP 缓存中提取指定股票的新闻。"""
+    if not mcp_cache:
+        return []
+    symbol = to_mcp_symbol(stock_code)
+    news_list = mcp_cache.get("news", {}).get(symbol, [])
+    return news_list
+
+
 # ── 数据抓取 ──────────────────────────────────────────────────
 
-# 腾讯自选股 MCP 工具（可通过 MCP 连接使用；此处为 fallback 到 akshare）
-# 当 MCP 不可用时，自动降级到 akshare stock_news_em
+# 腾讯自选股 MCP 工具（通过缓存文件读取，降级到 akshare）
+# MCP 缓存由 WorkBuddy 环境调用 mcp__westock-mcp__data_news 生成
 
 
-def fetch_stock_news(stock_code, stock_name, max_n=5, use_mcp=False):
+def fetch_stock_news(stock_code, stock_name, max_n=5, use_mcp=False, mcp_cache=None):
     """拉取个股新闻，返回 list of dict。
-    use_mcp=True 时尝试通过 MCP（需外部连接），否则用 akshare。
+    use_mcp=True 时优先读 MCP 缓存，降级到 akshare。
+    use_mcp=False 时直接用 akshare。
     """
-    # 优先尝试 akshare（稳定、无需额外连接）
+    # 尝试 MCP 缓存
+    if use_mcp and mcp_cache:
+        mcp_news = get_mcp_news_for_stock(mcp_cache, stock_code)
+        if mcp_news:
+            results = []
+            for n in mcp_news[:max_n]:
+                results.append({
+                    "title": n.get("title", ""),
+                    "content": n.get("content", ""),  # MCP list 模式无 content
+                    "time": n.get("time", ""),
+                    "source": n.get("source", "腾讯自选股"),
+                    "url": n.get("url", ""),
+                    "stock_code": stock_code,
+                    "stock_name": stock_name,
+                })
+            return results
+        # MCP 缓存中没有该股票，继续降级
+
+    # akshare fallback
     try:
         df = ak.stock_news_em(symbol=stock_code)
         if df is None or df.empty:
@@ -194,6 +258,16 @@ def collect_all(pf):
     ann_days = news_cfg.get("fund_announcement_days", 7)
     macro_keywords = news_cfg.get("macro_keywords", ["黄金", "白银", "PMI", "GDP", "CPI", "降息", "利率", "LPR"])
     hot_stocks_count = news_cfg.get("hot_stocks_count", 5)
+    use_mcp = news_cfg.get("use_mcp", False)
+
+    # 加载 MCP 缓存（如果启用）
+    mcp_cache = None
+    if use_mcp:
+        mcp_cache = load_mcp_cache()
+        if mcp_cache:
+            print(f"  ✅ MCP 缓存已加载（{mcp_cache.get('date', '?')}），优先使用腾讯自选股数据")
+        else:
+            print("  ℹ️ MCP 缓存不可用，全部使用 akshare 数据源")
 
     print("📡 正在拉取数据...")
 
@@ -208,7 +282,7 @@ def collect_all(pf):
         fund_news = []
         for sc, sn in zip(stocks, stock_names):
             print(f"    → {sn}({sc})")
-            news = fetch_stock_news(sc, sn, max_n=news_per_stock)
+            news = fetch_stock_news(sc, sn, max_n=news_per_stock, use_mcp=use_mcp, mcp_cache=mcp_cache)
             fund_news.extend(news)
         holding_news[code] = {
             "news": fund_news,
@@ -276,7 +350,7 @@ def collect_all(pf):
     hot_market_news = []
     for hs in hot_market_stocks:
         print(f"    → {hs['name']}({hs['code']})")
-        news = fetch_stock_news(hs["code"], hs["name"], max_n=3)
+        news = fetch_stock_news(hs["code"], hs["name"], max_n=3, use_mcp=use_mcp, mcp_cache=mcp_cache)
         hs["news"] = news
         hot_market_news.append(hs)
 
@@ -329,6 +403,9 @@ def sentiment_emoji(rate):
 def build_html(pf, data):
     generated_at = data["generated_at"]
     today = data["today"]
+    use_mcp = pf.get("news", {}).get("use_mcp", False)
+    mcp_active = use_mcp and os.path.exists(MCP_CACHE_PATH)
+    data_source = "腾讯自选股 MCP + akshare" if mcp_active else "akshare（东方财富/百度/雪球/微博）"
 
     # ── 持仓消息区 ──
     holding_html = ""
@@ -499,7 +576,7 @@ def build_html(pf, data):
 </style></head>
 <body><div class="wrap">
   <h1>📰 每日消息面参考卡</h1>
-  <div class="meta">生成时间：{generated_at} ｜ 数据来源：akshare（东方财富/百度/雪球/微博）</div>
+  <div class="meta">生成时间：{generated_at} ｜ 数据来源：{data_source}</div>
   <div class="meta" style="color:#c47f00">⚠️ 本卡仅做信息聚合与展示，<b>不构成任何投资建议</b>。新闻/研报来源已标注，点击可跳转原文。微博/雪球仅提供情绪代理数字，不代表大V原话。</div>
 
   <div class="section-title">📌 一、持仓消息区</div>
@@ -522,8 +599,8 @@ def build_html(pf, data):
   </div>
 
   <div class="disclaimer">
-    ⚠️ <b>风险提示</b>：本消息面参考卡仅基于 akshare 公开数据接口做信息聚合，<b>不构成任何投资建议</b>。
-    新闻/研报来自东方财富、证券时报、财联社等公开来源，点击「原文↗」可跳转查看。
+    ⚠️ <b>风险提示</b>：本消息面参考卡仅基于公开数据接口做信息聚合，<b>不构成任何投资建议</b>。
+    新闻来源：{'腾讯自选股（MCP）、' if mcp_active else ''}东方财富、证券时报、财联社等公开来源，点击「原文↗」可跳转查看。
     微博情绪系数为第三方聚合的讨论热度指标（-1 到 +3），不代表具体博主观点。
     雪球关注度为粉丝数量排行，与投资价值无关。
     基金有风险，投资须谨慎，决策请结合自身情况。

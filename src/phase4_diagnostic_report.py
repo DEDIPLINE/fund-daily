@@ -238,21 +238,17 @@ def build_html(d, period):
 </div></body></html>"""
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--period", choices=["weekly", "monthly"], default="monthly")
-    args = ap.parse_args()
-
+def main(period="monthly"):
     d = dg.run_diagnostics()
     if "error" in d:
         print("❌", d["error"])
         return
-    html = build_html(d, args.period)
+    html = build_html(d, period)
     today = datetime.date.today().strftime("%Y%m%d")
     out = os.path.join(REPORT_DIR, f"diag_{today}.html")
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
-    print(f"✅ {args.period} 诊断报告已生成：{out}")
+    print(f"✅ {period} 诊断报告已生成：{out}")
     print(f"   加权波动 {d['risk']['vol_annual']:.1f}% ｜ 最大回撤 {d['risk']['max_drawdown']:.1f}% ｜ "
           f"夏普 {d['risk']['sharpe']:.2f} ｜ HHI {d['concentration']['hhi']} ｜ 前三大 {d['concentration']['top3_weight']:.1f}%")
     if d["suggestions"]:
@@ -261,4 +257,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--period", choices=["weekly", "monthly"], default="monthly")
+    args = ap.parse_args()
+    main(args.period)

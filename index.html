@@ -54,8 +54,8 @@
       </div>
     </div>
     <div class="flex items-center gap-2">
-      <span class="text-xs text-slate-400" x-text="currentDate"></span>
-      <button class="px-3 py-1.5 text-xs bg-slate-700/50 hover:bg-slate-700 rounded-lg transition text-slate-300">
+      <span class="text-xs text-slate-400" x-text="generatedAt ? ('更新于 ' + generatedAt) : currentDate"></span>
+      <button onclick="refreshData()" class="px-3 py-1.5 text-xs bg-slate-700/50 hover:bg-slate-700 rounded-lg transition text-slate-300">
         刷新数据
       </button>
     </div>
@@ -216,7 +216,7 @@
         <!-- 持仓新闻区 -->
         <div class="mb-6">
           <h3 class="text-sm font-medium text-slate-400 mb-3 border-l-2 border-accent pl-3">📌 持仓消息</h3>
-          <div class="grid gap-3 md:grid-cols-2">
+          <div class="grid gap-3 md:grid-cols-2" x-show="newsItems.length">
             <template x-for="n in newsItems.slice(0, 6)" :key="n.title">
               <div class="bg-slate-800 rounded-xl p-4 card-hover border-l-2 border-accent/50">
                 <div class="flex items-start justify-between gap-2 mb-2">
@@ -233,24 +233,27 @@
               </div>
             </template>
           </div>
+          <div x-show="!newsItems.length" class="text-slate-500 text-sm py-4 text-center">暂无新闻数据，请先运行 <code class="text-accent-light">python main.py news</code></div>
         </div>
 
         <!-- 市场热点 -->
         <div class="mb-6">
           <h3 class="text-sm font-medium text-slate-400 mb-3 border-l-2 border-orange-500 pl-3">🔥 市场热点</h3>
-          <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3" x-show="hotStocks.length">
             <template x-for="h in hotStocks" :key="h.name">
               <div class="bg-slate-800 rounded-xl p-4 card-hover">
                 <div class="flex items-center gap-2 mb-2">
                   <span class="text-sm font-semibold text-white" x-text="h.name"></span>
-                  <span class="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-400"
+                  <span x-show="h.change != null && h.change !== 0"
+                        class="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-400"
                         :class="h.change >= 0 ? 'text-up' : 'text-down'"
-                        x-text="(h.change >= 0 ? '+' : '') + h.change.toFixed(2) + '%'"></span>
+                        x-text="(h.change >= 0 ? '+' : '') + (h.change || 0).toFixed(2) + '%'"></span>
                 </div>
-                <div class="text-xs text-slate-500" x-text="'关注度 ' + h.followers.toLocaleString()"></div>
+                <div class="text-xs text-slate-500" x-text="'关注度 ' + (h.followers || 0).toLocaleString()"></div>
               </div>
             </template>
           </div>
+          <div x-show="!hotStocks.length" class="text-slate-500 text-sm py-4 text-center">暂无热点数据</div>
         </div>
 
         <!-- 宏观日历 -->
@@ -307,9 +310,9 @@
         </div>
 
         <!-- 偏散热力图 -->
-        <div class="bg-slate-800 rounded-xl p-4">
+        <div class="bg-slate-800 rounded-xl p-4 mb-5">
           <h3 class="text-sm font-medium text-slate-400 mb-3">⚠️ 假分散预警（相关性 > 0.70）</h3>
-          <div class="flex flex-wrap gap-2">
+          <div class="flex flex-wrap gap-2" x-show="corrWarnings.length">
             <template x-for="p in corrWarnings" :key="p.pair">
               <div class="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-sm">
                 <span class="text-red-400 font-medium" x-text="p.pair"></span>
@@ -317,6 +320,22 @@
                 <span class="text-red-400 font-mono" x-text="p.value"></span>
               </div>
             </template>
+          </div>
+          <div x-show="!corrWarnings.length" class="text-slate-500 text-sm">无高相关对，分散度良好</div>
+        </div>
+
+        <!-- 再平衡建议 -->
+        <div class="bg-slate-800 rounded-xl p-4">
+          <h3 class="text-sm font-medium text-slate-400 mb-3">💡 再平衡建议</h3>
+          <div class="space-y-2">
+            <template x-for="(s, idx) in suggestions" :key="idx">
+              <div class="flex items-start gap-2 text-sm"
+                   :class="s.level === 'warning' ? 'text-yellow-400' : 'text-green-400'">
+                <span x-text="s.level === 'warning' ? '⚠️' : '✅'"></span>
+                <span class="flex-1 text-slate-300" x-text="s.text"></span>
+              </div>
+            </template>
+            <div x-show="!suggestions.length" class="text-slate-500 text-sm">暂无建议</div>
           </div>
         </div>
       </div>
@@ -397,11 +416,29 @@
 
   <script>
     async function loadData() {
+      // 优先从 API 获取（后端模式）；失败则回退到静态 JSON（离线模式）
       try {
-        const resp = await fetch('data/dashboard.json');
+        const resp = await fetch('/api/dashboard');
         if (resp.ok) return await resp.json();
       } catch(e) {}
+      try {
+        const resp2 = await fetch('data/dashboard.json');
+        if (resp2.ok) return await resp2.json();
+      } catch(e2) {}
       return null;
+    }
+
+    async function refreshData() {
+      // 尝试通过 API 触发数据刷新
+      try {
+        const resp = await fetch('/api/refresh', { method: 'POST' });
+        if (resp.ok) {
+          location.reload();
+          return;
+        }
+      } catch(e) {}
+      // API 不可用时直接刷新页面（重新加载现有 JSON）
+      location.reload();
     }
 
     function app() {
@@ -415,53 +452,21 @@
           { id: 'diagnosis', label: '持仓诊断', icon: '🩺', badge: null },
           { id: 'signals', label: '信号总览', icon: '🚦', badge: null },
         ],
-        totalAmount: 4382.59,
-        totalPnl: -88.10,
-        estPnl: 208.45,
-        estPct: 4.76,
-        signals: { red: 3, yellow: 6, green: 3, tp: 7, anomaly: 7 },
-        diag: { volatility: '23.1', mdd: '-15.9', sharpe: '1.24', hhi: '0.161' },
-        corrWarnings: [
-          { pair: '碳中和 ↔ 机器人', value: '0.867' },
-          { pair: '芯片 ↔ 数字经济', value: '0.736' },
-        ],
-        holdings: [
-          { code: '014194', shortName: '芯片指增C', amount: 986.63, nav: '1.2345', pct: -2.15, estPct: 12.07, light: 'red', lightLabel: '过热', gain: 132.0, tpTier: 25, anomaly: false, pctRank: 88, sparkPoints: '2,20 12,18 22,16 32,14 42,10 52,8 62,5 72,3 82,4 92,2' },
-          { code: '016531', shortName: '碳中和C', amount: 886.02, nav: '0.8765', pct: -1.80, estPct: 3.45, light: 'green', lightLabel: '低估', gain: -15.2, tpTier: 0, anomaly: true, pctRank: 15, sparkPoints: '2,5 12,8 22,12 32,15 42,18 52,20 62,19 72,18 82,20 92,22' },
-          { code: '000218', shortName: '黄金ETF联接A', amount: 759.44, nav: '1.5678', pct: 0.06, estPct: 1.60, light: 'yellow', lightLabel: '中性', gain: 45.7, tpTier: 25, anomaly: false, pctRank: 49, sparkPoints: '2,15 12,14 22,12 32,10 42,8 52,6 62,5 72,4 82,3 92,2' },
-          { code: '400015', shortName: '新能源混合', amount: 714.95, nav: '2.3456', pct: -0.43, estPct: 4.00, light: 'green', lightLabel: '低估', gain: -8.5, tpTier: 0, anomaly: false, pctRank: 18, sparkPoints: '2,10 12,12 22,14 32,16 42,18 52,17 62,19 72,20 82,21 92,22' },
-          { code: '270042', shortName: '纳指100QDII', amount: 430.71, nav: '3.4567', pct: -1.20, estPct: 0.04, light: 'red', lightLabel: '过热', gain: 28.3, tpTier: 20, anomaly: false, pctRank: 81, sparkPoints: '2,5 12,6 22,4 32,3 42,5 52,4 62,3 72,2 82,3 92,2' },
-          { code: '018229', shortName: '全球优质QDII', amount: 88.16, nav: '1.1234', pct: -0.80, estPct: null, light: 'red', lightLabel: '过热', gain: 22.1, tpTier: 20, anomaly: false, pctRank: 78, lag: true, sparkPoints: '2,8 12,7 22,6 32,5 42,6 52,5 62,4 72,3 82,4 92,3' },
-          { code: '017102', shortName: '数字经济A', amount: 84.88, nav: '0.9876', pct: 1.50, estPct: 5.20, light: 'yellow', lightLabel: '中性', gain: 12.8, tpTier: 15, anomaly: false, pctRank: 55, sparkPoints: '2,12 12,11 22,10 32,9 42,8 52,7 62,6 72,5 82,4 92,3' },
-          { code: '020607', shortName: '机器人ETF联接A', amount: 82.07, nav: '0.7654', pct: 3.20, estPct: 6.80, light: 'green', lightLabel: '低估', gain: -5.2, tpTier: 0, anomaly: true, pctRank: 12, sparkPoints: '2,18 12,16 22,17 32,15 42,16 52,18 62,20 72,19 82,21 92,20' },
-          { code: '023638', shortName: '电网设备ETF联接A', amount: 78.34, nav: '1.0123', pct: -0.50, estPct: 2.10, light: 'yellow', lightLabel: '中性', gain: 8.5, tpTier: 15, anomaly: false, pctRank: 45, sparkPoints: '2,10 12,9 22,11 32,10 42,9 52,8 62,9 72,10 82,11 92,10' },
-          { code: '016185', shortName: '电力公用ETF联接A', amount: 103.59, nav: '1.2345', pct: -0.30, estPct: null, light: 'yellow', lightLabel: '中性', gain: 5.2, tpTier: 0, anomaly: false, pctRank: 42, lag: true, sparkPoints: '2,8 12,9 22,10 32,9 42,8 52,7 62,8 72,9 82,10 92,9' },
-          { code: '008173', shortName: '稳泰债券C', amount: 101.92, nav: '1.0567', pct: 0.02, estPct: 0.03, light: null, lightLabel: '—', gain: 2.1, tpTier: 0, anomaly: false, pctRank: null, sparkPoints: '2,12 12,11 22,10 32,9 42,8 52,7 62,6 72,5 82,4 92,3' },
-          { code: '240022', shortName: '资源优选混合A', amount: 65.88, nav: '4.659', pct: 0.15, estPct: 3.08, light: 'yellow', lightLabel: '中性', gain: 28.5, tpTier: 25, anomaly: false, pctRank: 25, sparkPoints: '2,14 12,12 22,13 32,11 42,12 52,10 62,11 72,9 82,10 92,8' },
-        ],
-        newsItems: [
-          { title: '中国国新、中国诚通斥资600亿元托市后，A股强劲反弹！', summary: '拆解两大国资历史投资图谱：聚焦电子和通信行业。', source: '腾讯自选股', time: '21:13', tag: '市场' },
-          { title: '硬撼英特尔，中芯没有光刻机也能手搓成熟7nm', summary: 'Semianalysis拆解麒麟9030，中芯国际7nm工艺取得突破性进展。', source: '腾讯自选股', time: '17:29', tag: '芯片' },
-          { title: '钠电最大订单落地！宁德时代5GWh撬动欧洲储能市场', summary: '宁德时代钠电池获得欧洲大单，标志着钠电商业化进程加速。', source: '腾讯自选股', time: '20:20', tag: '新能源' },
-          { title: '山东黄金中期利润分配：拟每10股派发现金红利1元', summary: '预计总派发金额为4.61亿元，占扣除永续债利息后归母净利润的34.84%。', source: '财中社', time: '17:51', tag: '黄金' },
-          { title: '7月21日科创板主力资金净流入91.95亿元', summary: '中芯国际主力资金净流入14亿元，寒武纪净流入11.5亿元。', source: '证券时报网', time: '16:49', tag: '芯片' },
-          { title: '宁德时代与Solarpro签署2GWh合作协议', summary: '宁德时代持续拓展海外市场，与保加利亚Solarpro签署储能合作协议。', source: '腾讯自选股', time: '21:07', tag: '新能源' },
-        ],
-        hotStocks: [
-          { name: '赛力斯', change: 3.21, followers: 68549 },
-          { name: '格力电器', change: 1.85, followers: 39235 },
-          { name: '胜宏科技', change: 5.67, followers: 30679 },
-          { name: '新易盛', change: 8.19, followers: 29769 },
-          { name: '药明康德', change: -2.10, followers: 29251 },
-        ],
-        macroEvents: [
-          { time: '06:30', region: '美国', event: '美国7月20日SPDR黄金持仓', actual: '1003.59吨', importance: 2 },
-          { time: '06:30', region: '美国', event: '美国7月20日iShares白银持仓', actual: '15052.89吨', importance: 2 },
-          { time: '06:30', region: '美国', event: '美国7月20日iShares黄金持仓变动', actual: '-0.47吨', importance: 1 },
-          { time: '06:30', region: '美国', event: '美国7月17日NYMEX钯金库存', actual: '2336百盎司', importance: 1 },
-          { time: '06:30', region: '美国', event: '美国7月20日iShares黄金持仓', actual: '460.89吨', importance: 2 },
-          { time: '10:00', region: '中国', event: '中国6月LPR报价', actual: '3.10%', importance: 3 },
-        ],
+        totalAmount: 0,
+        totalPnl: 0,
+        estPnl: 0,
+        estPct: 0,
+        signals: { red: 0, yellow: 0, green: 0, tp: 0, anomaly: 0 },
+        diag: { volatility: '—', mdd: '—', sharpe: '—', hhi: '—' },
+        corrWarnings: [],
+        categoryPie: [],
+        benchmarkData: { categories: [], sharpe: [], volatility: [] },
+        suggestions: [],
+        holdings: [],
+        newsItems: [],
+        hotStocks: [],
+        macroEvents: [],
+        generatedAt: '',
         initCharts() {
           this.$watch('currentView', (val) => {
             if (val === 'diagnosis') {
@@ -477,22 +482,12 @@
             catEl._chart = chart;
             chart.setOption({
               backgroundColor: 'transparent',
-              tooltip: { trigger: 'item', formatter: '{b}: {c}元 ({d}%)' },
+              tooltip: { trigger: 'item', formatter: '{b}: {c}% ({d}%)' },
               series: [{
                 type: 'pie', radius: ['40%', '70%'], center: ['50%', '50%'],
                 itemStyle: { borderRadius: 6, borderColor: '#1e293b', borderWidth: 2 },
                 label: { color: '#94a3b8', fontSize: 11 },
-                data: [
-                  { value: 986.63, name: '半导体/芯片', itemStyle: { color: '#ef4444' } },
-                  { value: 886.02, name: '碳中和/制造', itemStyle: { color: '#3b82f6' } },
-                  { value: 759.44, name: '黄金', itemStyle: { color: '#eab308' } },
-                  { value: 714.95, name: '新能源/汽车', itemStyle: { color: '#22c55e' } },
-                  { value: 518.87, name: 'QDII', itemStyle: { color: '#a855f7' } },
-                  { value: 84.88, name: '数字经济', itemStyle: { color: '#06b6d4' } },
-                  { value: 160.41, name: '机器人/电网/电力', itemStyle: { color: '#f97316' } },
-                  { value: 101.92, name: '债券/避险', itemStyle: { color: '#64748b' } },
-                  { value: 65.88, name: '资源/周期', itemStyle: { color: '#8b5cf6' } },
-                ]
+                data: this.categoryPie.length ? this.categoryPie : [{ value: 1, name: '暂无数据' }]
               }]
             });
           }
@@ -501,16 +496,17 @@
           if (benchEl && !benchEl._chart) {
             const chart2 = echarts.init(benchEl, 'dark');
             benchEl._chart = chart2;
+            const bd = this.benchmarkData;
             chart2.setOption({
               backgroundColor: 'transparent',
               tooltip: { trigger: 'axis' },
-              xAxis: { type: 'category', data: ['组合', '沪深300', '国债指数'], axisLabel: { color: '#94a3b8' }, axisLine: { lineStyle: { color: '#334155' } } },
+              xAxis: { type: 'category', data: bd.categories.length ? bd.categories : ['暂无'], axisLabel: { color: '#94a3b8' }, axisLine: { lineStyle: { color: '#334155' } } },
               yAxis: [
-                { type: 'value', name: '夏普/年化', axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: '#1e293b' } } },
+                { type: 'value', name: '夏普/年化%', axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: '#1e293b' } } },
               ],
               series: [
-                { name: '夏普比率', type: 'bar', barWidth: 30, data: [1.24, 0.65, 0.88], itemStyle: { color: '#3b82f6', borderRadius: [4,4,0,0] } },
-                { name: '年化波动率%', type: 'bar', barWidth: 30, data: [23.1, 17.0, 0.78], itemStyle: { color: '#ef4444', borderRadius: [4,4,0,0] } },
+                { name: '夏普比率', type: 'bar', barWidth: 30, data: bd.sharpe.length ? bd.sharpe : [0], itemStyle: { color: '#3b82f6', borderRadius: [4,4,0,0] } },
+                { name: '年化波动率%', type: 'bar', barWidth: 30, data: bd.volatility.length ? bd.volatility : [0], itemStyle: { color: '#ef4444', borderRadius: [4,4,0,0] } },
               ],
               legend: { textStyle: { color: '#94a3b8', fontSize: 11 }, top: 0 }
             });
@@ -521,19 +517,26 @@
       const data = await loadData();
       if (data) {
         const s = data.summary || {};
-        const fb = fallback;
         return {
-          ...fb,
+          ...fallback,
           sidebarOpen: false,
           currentView: 'daily',
           currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }),
-          totalAmount: s.totalAmount || fb.totalAmount,
-          totalPnl: s.totalPnl || fb.totalPnl,
-          estPnl: s.estPnl || fb.estPnl,
-          estPct: s.estPct || fb.estPct,
-          signals: s.signals || fb.signals,
-          holdings: data.holdings || fb.holdings,
-          macroEvents: data.macroEvents && data.macroEvents.length ? data.macroEvents : fb.macroEvents,
+          generatedAt: data.generatedAt || '',
+          totalAmount: s.totalAmount ?? fallback.totalAmount,
+          totalPnl: s.totalPnl ?? fallback.totalPnl,
+          estPnl: s.estPnl ?? fallback.estPnl,
+          estPct: s.estPct ?? fallback.estPct,
+          signals: s.signals || fallback.signals,
+          holdings: data.holdings || fallback.holdings,
+          macroEvents: data.macroEvents || fallback.macroEvents,
+          diag: data.diag || fallback.diag,
+          corrWarnings: data.corrWarnings || fallback.corrWarnings,
+          categoryPie: data.categoryPie || fallback.categoryPie,
+          benchmarkData: data.benchmarkData || fallback.benchmarkData,
+          suggestions: data.suggestions || fallback.suggestions,
+          newsItems: data.newsItems || fallback.newsItems,
+          hotStocks: data.hotStocks || fallback.hotStocks,
         };
       }
       return { ...fallback, sidebarOpen: false, currentView: 'daily',
