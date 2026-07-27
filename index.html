@@ -418,9 +418,18 @@
     function loadData() {
       // 优先从 API 获取（后端模式）；失败则回退到静态 JSON（离线模式）
       return fetch('/api/dashboard')
-        .then(resp => resp.ok ? resp.json() : Promise.reject())
-        .catch(() => fetch('data/dashboard.json'))
-        .then(resp2 => resp2.ok ? resp2.json() : Promise.reject())
+        .then(resp => {
+          if (resp.ok) return resp.json();
+          throw new Error('API not available');
+        })
+        .catch(() => {
+          // API 不可用，回退到静态 JSON
+          return fetch('data/dashboard.json')
+            .then(resp2 => {
+              if (resp2.ok) return resp2.json();
+              throw new Error('Static JSON not available');
+            });
+        })
         .catch(() => null);
     }
 
