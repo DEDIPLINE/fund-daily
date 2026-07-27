@@ -282,16 +282,22 @@
 
     // 切换视图
     function switchView(viewId) {
-      appState.currentView = viewId;
-      renderNavItems();
-      renderCurrentView();
-      Logger.info('切换到视图: ' + viewId);
+      try {
+        appState.currentView = viewId;
+        renderNavItems();
+        renderCurrentView();
+        Logger.info('切换到视图: ' + viewId);
+      } catch (error) {
+        Logger.error('视图切换失败', { viewId, error: error.message });
+        console.error('视图切换失败:', error);
+      }
     }
 
     // 渲染当前视图
     function renderCurrentView() {
-      const container = document.getElementById('views-container');
-      if (!container) return;
+      try {
+        const container = document.getElementById('views-container');
+        if (!container) return;
       
       // 根据当前视图渲染对应内容
       switch (appState.currentView) {
@@ -314,6 +320,11 @@
       // 初始化图表（如果是诊断视图）
       if (appState.currentView === 'diagnosis') {
         setTimeout(() => initCharts(), 100);
+      }
+      } catch (error) {
+        Logger.error('视图渲染失败', { view: appState.currentView, error: error.message });
+        console.error('视图渲染失败:', error);
+        container.innerHTML = '<div class="text-center py-10 text-red-500">视图渲染失败，请刷新页面重试</div>';
       }
     }
 
