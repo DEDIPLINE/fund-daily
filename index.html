@@ -387,7 +387,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  ${appState.holdings.map(h => {
+                  ${appState.holdings.length > 0 ? appState.holdings.map(h => {
                     const hPnlClass = h.pnl >= 0 ? 'text-up' : 'text-down';
                     const hPnlSign = h.pnl >= 0 ? '+' : '';
                     return `
@@ -397,11 +397,11 @@
                           <div class="text-xs text-slate-500">${h.code}</div>
                         </td>
                         <td class="p-3">¥${h.amount.toLocaleString()}</td>
-                        <td class="p-3 ${hPnlClass}">${pnlSign}¥${h.pnl.toLocaleString()}</td>
+                        <td class="p-3 ${hPnlClass}">${hPnlSign}¥${h.pnl.toLocaleString()}</td>
                         <td class="p-3">${h.weight}%</td>
                       </tr>
                     `;
-                  }).join('')}
+                  }).join('') : '<tr><td colspan="4" class="p-4 text-center text-slate-500">暂无持仓数据</td></tr>'}
                 </tbody>
               </table>
             </div>
