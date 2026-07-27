@@ -522,25 +522,24 @@
       loadData().then(data => {
         if (data) {
           const s = data.summary || {};
-          Object.assign(fallback, {
-            sidebarOpen: false,
-            currentView: 'daily',
-            currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }),
-            generatedAt: data.generatedAt || '',
-            totalAmount: s.totalAmount ?? fallback.totalAmount,
-            totalPnl: s.totalPnl ?? fallback.totalPnl,
-            estPnl: s.estPnl ?? fallback.estPnl,
-            estPct: s.estPct ?? fallback.estPct,
-            signals: s.signals || fallback.signals,
-            holdings: data.holdings || fallback.holdings,
-            macroEvents: data.macroEvents || fallback.macroEvents,
-            diag: data.diag || fallback.diag,
-            corrWarnings: data.corrWarnings || fallback.corrWarnings,
-            categoryPie: data.categoryPie || fallback.categoryPie,
-            benchmarkData: data.benchmarkData || fallback.benchmarkData,
-            suggestions: data.suggestions || fallback.suggestions,
-            newsItems: data.newsItems || fallback.newsItems,
-            hotStocks: data.hotStocks || fallback.hotStocks,
+          // 使用 Alpine.js 的响应式更新方式
+          this.$nextTick(() => {
+            this.totalAmount = s.totalAmount ?? this.totalAmount;
+            this.totalPnl = s.totalPnl ?? this.totalPnl;
+            this.estPnl = s.estPnl ?? this.estPnl;
+            this.estPct = s.estPct ?? this.estPct;
+            this.signals = s.signals || this.signals;
+            this.holdings = data.holdings || this.holdings;
+            this.macroEvents = data.macroEvents || this.macroEvents;
+            this.diag = data.diag || this.diag;
+            this.corrWarnings = data.corrWarnings || this.corrWarnings;
+            this.categoryPie = data.categoryPie || this.categoryPie;
+            this.benchmarkData = data.benchmarkData || this.benchmarkData;
+            this.suggestions = data.suggestions || this.suggestions;
+            this.newsItems = data.newsItems || this.newsItems;
+            this.hotStocks = data.hotStocks || this.hotStocks;
+            this.generatedAt = data.generatedAt || '';
+            this.currentDate = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
           });
         }
       });
