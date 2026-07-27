@@ -624,7 +624,10 @@
               throw new Error('Static JSON not available');
             });
         })
-        .catch(() => null);
+        .catch(() => {
+          console.error('数据加载失败：API 和静态 JSON 都不可用');
+          return null;
+        });
     }
 
     async function refreshData() {
@@ -717,33 +720,7 @@
       return fallback;
     }
 
-    // Alpine.js init 方法 - 在组件初始化后执行
-    function init() {
-      // 加载数据并更新组件
-      const self = this;  // 保存 Alpine.js 组件实例的引用
-      loadData().then(data => {
-        if (data) {
-          const s = data.summary || {};
-          // 直接更新 Alpine.js 组件的属性
-          self.totalAmount = s.totalAmount ?? self.totalAmount;
-          self.totalPnl = s.totalPnl ?? self.totalPnl;
-          self.estPnl = s.estPnl ?? self.estPnl;
-          self.estPct = s.estPct ?? self.estPct;
-          self.signals = s.signals || self.signals;
-          self.holdings = data.holdings || self.holdings;
-          self.macroEvents = data.macroEvents || self.macroEvents;
-          self.diag = data.diag || self.diag;
-          self.corrWarnings = data.corrWarnings || self.corrWarnings;
-          self.categoryPie = data.categoryPie || self.categoryPie;
-          self.benchmarkData = data.benchmarkData || self.benchmarkData;
-          self.suggestions = data.suggestions || self.suggestions;
-          self.newsItems = data.newsItems || self.newsItems;
-          self.hotStocks = data.hotStocks || self.hotStocks;
-          self.generatedAt = data.generatedAt || '';
-          self.currentDate = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
-        }
-      });
-    }
+    // init() 函数已移除，数据加载直接在 x-init 中执行
   </script>
 
   <!-- 日志面板 -->
