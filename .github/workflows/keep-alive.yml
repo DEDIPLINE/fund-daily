@@ -1,7 +1,7 @@
-# GitHub Actions: 保持 Hugging Face Space 活跃
-# 每 15 分钟 ping 一次 Space，防止 48 小时无访问后休眠
+# GitHub Actions: 保持 GitHub Pages 活跃
+# 每 15 分钟 ping 一次网站，防止 GitHub Pages 缓存问题
 
-name: Keep HF Space Alive
+name: Keep GitHub Pages Alive
 
 on:
   schedule:
@@ -13,26 +13,20 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Space
+      - name: Ping GitHub Pages
         run: |
-          # 替换为你的 HF Space URL
-          # 格式：https://<用户名>-<Space名>.hf.space
-          SPACE_URL="${{ secrets.HF_SPACE_URL }}"
+          # GitHub Pages URL
+          PAGES_URL="https://DEDIPLINE.github.io/fund-daily/"
           
-          if [ -z "$SPACE_URL" ]; then
-            echo "⚠️ HF_SPACE_URL secret 未设置"
-            exit 1
-          fi
-          
-          echo "🔄 Pinging Space: $SPACE_URL"
+          echo "🔄 Pinging GitHub Pages: $PAGES_URL"
           
           # 发送请求（忽略响应内容，只要不超时就行）
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$SPACE_URL" || echo "000")
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$PAGES_URL" || echo "000")
           
           if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Space 状态正常 (HTTP $HTTP_CODE)"
+            echo "✅ GitHub Pages 状态正常 (HTTP $HTTP_CODE)"
           elif [ "$HTTP_CODE" = "000" ]; then
-            echo "⚠️ Space 可能正在启动中（冷启动），请稍后重试"
+            echo "⚠️ GitHub Pages 可能正在部署中，请稍后重试"
           else
-            echo "⚠️ Space 返回 HTTP $HTTP_CODE"
+            echo "⚠️ GitHub Pages 返回 HTTP $HTTP_CODE"
           fi
