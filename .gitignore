@@ -25,7 +25,6 @@ Thumbs.db
 # Project data (generated, do not track)
 data/history/
 data/reports/
-data/dashboard.json
 data/fund_daily.db
 data/mcp_news_cache.json
 

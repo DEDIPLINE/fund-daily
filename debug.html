@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 基金助手 - 调试页面</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .log-entry { font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 12px; }
+    .log-info { color: #60a5fa; }
+    .log-warn { color: #fbbf24; }
+    .log-error { color: #f87171; }
+    .log-data { background: #1e293b; padding: 8px; border-radius: 4px; margin-top: 4px; white-space: pre-wrap; word-break: break-all; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-200 min-h-screen p-6">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-2xl font-bold text-white mb-6">🔧 AI 基金助手调试页面</h1>
+    
+    <!-- 测试按钮 -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <button onclick="testDataLoad()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+        测试数据加载
+      </button>
+      <button onclick="testAPI()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
+        测试 API 连接
+      </button>
+      <button onclick="testFetch()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition">
+        测试 Fetch 请求
+      </button>
+      <button onclick="clearLogs()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition">
+        清空日志
+      </button>
+    </div>
+
+    <!-- 状态信息 -->
+    <div class="bg-slate-800 rounded-xl p-4 mb-6">
+      <h2 class="text-lg font-semibold text-white mb-3">📊 系统状态</h2>
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <span class="text-slate-400">当前时间：</span>
+          <span id="current-time" class="text-white"></span>
+        </div>
+        <div>
+          <span class="text-slate-400">页面状态：</span>
+          <span id="page-status" class="text-white">就绪</span>
+        </div>
+        <div>
+          <span class="text-slate-400">数据文件：</span>
+          <span id="data-status" class="text-white">未检查</span>
+        </div>
+        <div>
+          <span class="text-slate-400">API 状态：</span>
+          <span id="api-status" class="text-white">未检查</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据预览 -->
+    <div class="bg-slate-800 rounded-xl p-4 mb-6">
+      <h2 class="text-lg font-semibold text-white mb-3">📁 数据预览</h2>
+      <pre id="data-preview" class="bg-slate-900 rounded-lg p-4 text-sm overflow-auto max-h-64 font-mono">等待测试...</pre>
+    </div>
+
+    <!-- 日志面板 -->
+    <div class="bg-slate-800 rounded-xl p-4">
+      <h2 class="text-lg font-semibold text-white mb-3">📝 运行日志</h2>
+      <div id="log-panel" class="bg-slate-900 rounded-lg p-4 h-64 overflow-auto font-mono text-sm">
+        <div class="log-entry log-info">[系统] 调试页面已加载</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 日志系统
+    const logs = [];
+    const maxLogs = 100;
+
+    function addLog(level, message, data = null) {
+      const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      const logEntry = { timestamp, level, message, data };
+      logs.unshift(logEntry);
+      
+      // 保持日志数量
+      if (logs.length > maxLogs) {
+        logs.pop();
+      }
+      
+      // 更新日志面板
+      const panel = document.getElementById('log-panel');
+      const logElement = document.createElement('div');
+      logElement.className = `log-entry log-${level}`;
+      logElement.innerHTML = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+      
+      if (data) {
+        const dataElement = document.createElement('pre');
+        dataElement.className = 'log-data';
+        dataElement.textContent = JSON.stringify(data, null, 2);
+        logElement.appendChild(dataElement);
+      }
+      
+      panel.insertBefore(logElement, panel.firstChild);
+      
+      // 控制台输出
+      console.log(`[${timestamp}] [${level.toUpperCase()}]`, message, data || '');
+    }
+
+    // 更新时间
+    function updateTime() {
+      document.getElementById('current-time').textContent = 
+        new Date().toLocaleString('zh-CN', { hour12: false });
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+
+    // 测试数据加载
+    async function testDataLoad() {
+      addLog('info', '开始测试数据加载...');
+      document.getElementById('page-status').textContent = '测试中...';
+      
+      try {
+        addLog('info', '尝试加载 data/dashboard.json');
+        const response = await fetch('data/dashboard.json');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        addLog('info', '数据加载成功', { 
+          keys: Object.keys(data),
+          generatedAt: data.generatedAt,
+          holdingsCount: data.holdings?.length || 0
+        });
+        
+        document.getElementById('data-status').textContent = '✅ 成功';
+        document.getElementById('data-status').className = 'text-green-400';
+        
+        // 显示数据预览
+        const preview = document.getElementById('data-preview');
+        preview.textContent = JSON.stringify(data, null, 2);
+        
+        addLog('info', '数据预览已更新');
+        
+      } catch (error) {
+        addLog('error', '数据加载失败', { 
+          error: error.message,
+          stack: error.stack 
+        });
+        
+        document.getElementById('data-status').textContent = '❌ 失败';
+        document.getElementById('data-status').className = 'text-red-400';
+        
+        document.getElementById('data-preview').textContent = `错误: ${error.message}`;
+      }
+      
+      document.getElementById('page-status').textContent = '测试完成';
+    }
+
+    // 测试 API 连接
+    async function testAPI() {
+      addLog('info', '开始测试 API 连接...');
+      document.getElementById('api-status').textContent = '测试中...';
+      
+      try {
+        addLog('info', '尝试连接 /api/dashboard');
+        const response = await fetch('/api/dashboard');
+        
+        if (response.ok) {
+          const data = await response.json();
+          addLog('info', 'API 连接成功', { 
+            status: response.status,
+            dataSize: JSON.stringify(data).length
+          });
+          
+          document.getElementById('api-status').textContent = '✅ 连接成功';
+          document.getElementById('api-status').className = 'text-green-400';
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+      } catch (error) {
+        addLog('warn', 'API 连接失败（这是正常的，GitHub Pages 没有后端）', { 
+          error: error.message 
+        });
+        
+        document.getElementById('api-status').textContent = '⚠️ 无后端（正常）';
+        document.getElementById('api-status').className = 'text-yellow-400';
+      }
+    }
+
+    // 测试 Fetch 请求
+    async function testFetch() {
+      addLog('info', '开始测试 Fetch 请求...');
+      
+      try {
+        // 测试不同路径
+        const paths = [
+          'data/dashboard.json',
+          './data/dashboard.json',
+          '/data/dashboard.json',
+          'https://dedipline.github.io/fund-daily/data/dashboard.json'
+        ];
+        
+        for (const path of paths) {
+          addLog('info', `测试路径: ${path}`);
+          try {
+            const response = await fetch(path);
+            addLog('info', `${path} - 状态: ${response.status}`);
+          } catch (error) {
+            addLog('error', `${path} - 失败: ${error.message}`);
+          }
+        }
+        
+      } catch (error) {
+        addLog('error', 'Fetch 测试失败', { error: error.message });
+      }
+    }
+
+    // 清空日志
+    function clearLogs() {
+      logs.length = 0;
+      const panel = document.getElementById('log-panel');
+      panel.innerHTML = '<div class="log-entry log-info">[系统] 日志已清空</div>';
+      addLog('info', '日志已清空');
+    }
+
+    // 页面加载完成
+    addLog('info', '调试页面加载完成');
+    addLog('info', '当前页面 URL: ' + window.location.href);
+  </script>
+</body>
+</html>

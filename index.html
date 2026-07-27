@@ -22,6 +22,64 @@
     .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
     .spark-line { stroke-dasharray: 300; stroke-dashoffset: 300; animation: drawLine 1s ease forwards; }
     @keyframes drawLine { to { stroke-dashoffset: 0; } }
+    
+    /* 日志面板样式 */
+    .log-panel { 
+      position: fixed; 
+      bottom: 0; 
+      right: 0; 
+      width: 400px; 
+      height: 300px; 
+      background: rgba(30, 41, 59, 0.95); 
+      border-top-left-radius: 12px; 
+      border: 1px solid rgba(71, 85, 105, 0.5);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.3s ease;
+      transform: translateY(calc(100% - 40px));
+    }
+    .log-panel.expanded {
+      transform: translateY(0);
+    }
+    .log-panel-header {
+      padding: 10px 15px;
+      background: rgba(51, 65, 85, 0.8);
+      border-bottom: 1px solid rgba(71, 85, 105, 0.5);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+    .log-panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 12px;
+    }
+    .log-entry {
+      margin-bottom: 8px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgba(30, 41, 59, 0.5);
+    }
+    .log-time { color: #94a3b8; }
+    .log-level { font-weight: bold; }
+    .log-info .log-level { color: #60a5fa; }
+    .log-warn .log-level { color: #fbbf24; }
+    .log-error .log-level { color: #f87171; }
+    .log-message { color: #e2e8f0; }
+    .log-data { 
+      background: rgba(15, 23, 42, 0.8); 
+      padding: 4px 8px; 
+      border-radius: 4px; 
+      margin-top: 4px; 
+      white-space: pre-wrap; 
+      word-break: break-all; 
+      color: #94a3b8;
+      font-size: 11px;
+    }
   </style>
   <script>
     tailwind.config = {
@@ -38,6 +96,82 @@
         }
       }
     }
+
+    // 前端日志系统
+    const Logger = {
+      logs: [],
+      maxLogs: 100,
+
+      log: function(level, message, data = null) {
+        const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        const logEntry = { timestamp, level, message, data };
+        this.logs.unshift(logEntry);
+
+        // 保持日志数量限制
+        if (this.logs.length > this.maxLogs) {
+          this.logs.pop();
+        }
+
+        // 控制台输出
+        const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
+        switch(level) {
+          case 'error':
+            console.error(prefix, message, data || '');
+            break;
+          case 'warn':
+            console.warn(prefix, message, data || '');
+            break;
+          case 'info':
+            console.info(prefix, message, data || '');
+            break;
+          default:
+            console.log(prefix, message, data || '');
+        }
+
+        // 更新页面日志面板（如果存在）
+        this.updateLogPanel();
+
+        return logEntry;
+      },
+
+      info: function(message, data) { return this.log('info', message, data); },
+      warn: function(message, data) { return this.log('warn', message, data); },
+      error: function(message, data) { return this.log('error', message, data); },
+
+      updateLogPanel: function() {
+        const panel = document.getElementById('log-panel-content');
+        if (panel) {
+          panel.innerHTML = this.logs.map(log =>
+            `<div class="log-entry log-${log.level}">` +
+            `<span class="log-time">${log.timestamp}</span> ` +
+            `<span class="log-level">[${log.level.toUpperCase()}]</span> ` +
+            `<span class="log-message">${log.message}</span>` +
+            (log.data ? `<pre class="log-data">${JSON.stringify(log.data, null, 2)}</pre>` : '') +
+            `</div>`
+          ).join('');
+        }
+      },
+
+      clear: function() {
+        this.logs = [];
+        this.updateLogPanel();
+        console.clear();
+        this.info('日志已清空');
+      }
+    };
+
+    // 全局错误处理
+    window.onerror = function(msg, url, line, col, error) {
+      Logger.error('JavaScript错误', { msg, url, line, col, error: error?.message });
+      return false;
+    };
+
+    window.onunhandledrejection = function(e) {
+      Logger.error('未处理的Promise拒绝', { reason: e.reason });
+    };
+
+    // 初始化日志
+    Logger.info('日志系统已初始化');
   </script>
 </head>
 <body class="dark bg-slate-900 text-slate-200 min-h-screen" x-data="{
@@ -68,8 +202,10 @@
   generatedAt: ''
 }" x-init="
   // 加载数据
+  Logger.info('开始加载数据');
   loadData().then(data => {
     if (data) {
+      Logger.info('数据加载成功', { keys: Object.keys(data) });
       const s = data.summary || {};
       this.totalAmount = s.totalAmount ?? this.totalAmount;
       this.totalPnl = s.totalPnl ?? this.totalPnl;
@@ -86,9 +222,15 @@
       this.newsItems = data.newsItems || this.newsItems;
       this.hotStocks = data.hotStocks || this.hotStocks;
       this.generatedAt = data.generatedAt || '';
+      Logger.info('数据已更新到组件');
+    } else {
+      Logger.warn('数据加载失败或为空');
     }
     // 初始化图表
+    Logger.info('初始化图表');
     this.initCharts();
+  }).catch(err => {
+    Logger.error('数据加载异常', { error: err.message });
   });
 " x-cloak>
 
@@ -600,6 +742,43 @@
         }
       });
     }
+  </script>
+
+  <!-- 日志面板 -->
+  <div id="log-panel" class="log-panel">
+    <div class="log-panel-header" onclick="toggleLogPanel()">
+      <span>📝 运行日志 (<span id="log-count">0</span>)</span>
+      <button onclick="event.stopPropagation(); Logger.clear();" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">清空</button>
+    </div>
+    <div id="log-panel-content" class="log-panel-content"></div>
+  </div>
+
+  <script>
+    // 切换日志面板
+    function toggleLogPanel() {
+      const panel = document.getElementById('log-panel');
+      panel.classList.toggle('expanded');
+      const count = document.getElementById('log-count');
+      count.textContent = Logger.logs.length;
+    }
+
+    // 更新日志计数
+    function updateLogCount() {
+      const count = document.getElementById('log-count');
+      if (count) {
+        count.textContent = Logger.logs.length;
+      }
+    }
+
+    // 重写 Logger.updateLogPanel 以更新计数
+    const originalUpdateLogPanel = Logger.updateLogPanel;
+    Logger.updateLogPanel = function() {
+      originalUpdateLogPanel.call(this);
+      updateLogCount();
+    };
+
+    // 初始化日志面板
+    Logger.info('日志面板已初始化');
   </script>
 </body>
 </html>

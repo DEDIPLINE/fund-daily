@@ -14,19 +14,40 @@ AI 基金助手 — 统一入口
 """
 import sys
 import os
+import logging
+from datetime import datetime
+
+# 配置日志系统
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler('fund-daily.log', encoding='utf-8')
+    ]
+)
+logger = logging.getLogger('fund-daily')
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC_DIR = os.path.join(ROOT, "src")
 sys.path.insert(0, SRC_DIR)
 
+logger.info(f"程序启动 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
 
 def run_daily():
     """运行 Phase1+1.5 每日收盘日报"""
+    logger.info("开始生成每日收盘日报")
     print("=" * 50)
     print("📊 每日收盘日报")
     print("=" * 50)
-    import phase1_daily_report
-    phase1_daily_report.main()
+    try:
+        import phase1_daily_report
+        phase1_daily_report.main()
+        logger.info("每日收盘日报生成完成")
+    except Exception as e:
+        logger.error(f"每日收盘日报生成失败: {e}", exc_info=True)
+        raise
 
 
 def run_news():
@@ -49,11 +70,28 @@ def run_diag(period="monthly"):
 
 def run_export():
     """导出仪表盘 JSON 数据"""
+    logger.info("开始导出仪表盘 JSON 数据")
     print("=" * 50)
     print("📡 仪表盘数据导出")
     print("=" * 50)
-    import export_json
-    export_json.main()
+    try:
+        import export_json
+        export_json.main()
+        logger.info("仪表盘 JSON 数据导出完成")
+        
+        # 检查导出结果
+        import json
+        dashboard_path = os.path.join(ROOT, "data", "dashboard.json")
+        if os.path.exists(dashboard_path):
+            with open(dashboard_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            logger.info(f"导出数据检查 - 生成时间: {data.get('generatedAt')}")
+            logger.info(f"导出数据检查 - 持仓数量: {len(data.get('holdings', []))}")
+        else:
+            logger.warning("dashboard.json 文件不存在")
+    except Exception as e:
+        logger.error(f"仪表盘 JSON 数据导出失败: {e}", exc_info=True)
+        raise
 
 
 def run_noon_export():
