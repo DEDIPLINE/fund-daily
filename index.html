@@ -525,26 +525,27 @@
     // Alpine.js init 方法 - 在组件初始化后执行
     function init() {
       // 加载数据并更新组件
+      const self = this;  // 保存 Alpine.js 组件实例的引用
       loadData().then(data => {
         if (data) {
           const s = data.summary || {};
           // 直接更新 Alpine.js 组件的属性
-          this.totalAmount = s.totalAmount ?? this.totalAmount;
-          this.totalPnl = s.totalPnl ?? this.totalPnl;
-          this.estPnl = s.estPnl ?? this.estPnl;
-          this.estPct = s.estPct ?? this.estPct;
-          this.signals = s.signals || this.signals;
-          this.holdings = data.holdings || this.holdings;
-          this.macroEvents = data.macroEvents || this.macroEvents;
-          this.diag = data.diag || this.diag;
-          this.corrWarnings = data.corrWarnings || this.corrWarnings;
-          this.categoryPie = data.categoryPie || this.categoryPie;
-          this.benchmarkData = data.benchmarkData || this.benchmarkData;
-          this.suggestions = data.suggestions || this.suggestions;
-          this.newsItems = data.newsItems || this.newsItems;
-          this.hotStocks = data.hotStocks || this.hotStocks;
-          this.generatedAt = data.generatedAt || '';
-          this.currentDate = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+          self.totalAmount = s.totalAmount ?? self.totalAmount;
+          self.totalPnl = s.totalPnl ?? self.totalPnl;
+          self.estPnl = s.estPnl ?? self.estPnl;
+          self.estPct = s.estPct ?? self.estPct;
+          self.signals = s.signals || self.signals;
+          self.holdings = data.holdings || self.holdings;
+          self.macroEvents = data.macroEvents || self.macroEvents;
+          self.diag = data.diag || self.diag;
+          self.corrWarnings = data.corrWarnings || self.corrWarnings;
+          self.categoryPie = data.categoryPie || self.categoryPie;
+          self.benchmarkData = data.benchmarkData || self.benchmarkData;
+          self.suggestions = data.suggestions || self.suggestions;
+          self.newsItems = data.newsItems || self.newsItems;
+          self.hotStocks = data.hotStocks || self.hotStocks;
+          self.generatedAt = data.generatedAt || '';
+          self.currentDate = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
         }
       });
     }
