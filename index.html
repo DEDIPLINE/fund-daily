@@ -40,7 +40,7 @@
     }
   </script>
 </head>
-<body class="dark bg-slate-900 text-slate-200 min-h-screen" x-data="await app()" x-init="initCharts()" x-cloak>
+<body class="dark bg-slate-900 text-slate-200 min-h-screen" x-data="app()" x-init="initCharts()" x-cloak>
 
   <!-- 顶部导航栏 -->
   <header class="fixed top-0 left-0 right-0 h-14 bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 z-50 flex items-center justify-between px-4">
@@ -415,17 +415,13 @@
   </div>
 
   <script>
-    async function loadData() {
+    function loadData() {
       // 优先从 API 获取（后端模式）；失败则回退到静态 JSON（离线模式）
-      try {
-        const resp = await fetch('/api/dashboard');
-        if (resp.ok) return await resp.json();
-      } catch(e) {}
-      try {
-        const resp2 = await fetch('data/dashboard.json');
-        if (resp2.ok) return await resp2.json();
-      } catch(e2) {}
-      return null;
+      return fetch('/api/dashboard')
+        .then(resp => resp.ok ? resp.json() : Promise.reject())
+        .catch(() => fetch('data/dashboard.json'))
+        .then(resp2 => resp2.ok ? resp2.json() : Promise.reject())
+        .catch(() => null);
     }
 
     async function refreshData() {
@@ -441,7 +437,7 @@
       location.reload();
     }
 
-    async function app() {
+    function app() {
       const fallback = {
         sidebarOpen: false,
         currentView: 'daily',
@@ -514,31 +510,31 @@
         },
       };
       // Try loading real data from dashboard.json
-      const data = await loadData();
-      if (data) {
-        const s = data.summary || {};
-        return {
-          ...fallback,
-          sidebarOpen: false,
-          currentView: 'daily',
-          currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }),
-          generatedAt: data.generatedAt || '',
-          totalAmount: s.totalAmount ?? fallback.totalAmount,
-          totalPnl: s.totalPnl ?? fallback.totalPnl,
-          estPnl: s.estPnl ?? fallback.estPnl,
-          estPct: s.estPct ?? fallback.estPct,
-          signals: s.signals || fallback.signals,
-          holdings: data.holdings || fallback.holdings,
-          macroEvents: data.macroEvents || fallback.macroEvents,
-          diag: data.diag || fallback.diag,
-          corrWarnings: data.corrWarnings || fallback.corrWarnings,
-          categoryPie: data.categoryPie || fallback.categoryPie,
-          benchmarkData: data.benchmarkData || fallback.benchmarkData,
-          suggestions: data.suggestions || fallback.suggestions,
-          newsItems: data.newsItems || fallback.newsItems,
-          hotStocks: data.hotStocks || fallback.hotStocks,
-        };
-      }
+      loadData().then(data => {
+        if (data) {
+          const s = data.summary || {};
+          Object.assign(fallback, {
+            sidebarOpen: false,
+            currentView: 'daily',
+            currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }),
+            generatedAt: data.generatedAt || '',
+            totalAmount: s.totalAmount ?? fallback.totalAmount,
+            totalPnl: s.totalPnl ?? fallback.totalPnl,
+            estPnl: s.estPnl ?? fallback.estPnl,
+            estPct: s.estPct ?? fallback.estPct,
+            signals: s.signals || fallback.signals,
+            holdings: data.holdings || fallback.holdings,
+            macroEvents: data.macroEvents || fallback.macroEvents,
+            diag: data.diag || fallback.diag,
+            corrWarnings: data.corrWarnings || fallback.corrWarnings,
+            categoryPie: data.categoryPie || fallback.categoryPie,
+            benchmarkData: data.benchmarkData || fallback.benchmarkData,
+            suggestions: data.suggestions || fallback.suggestions,
+            newsItems: data.newsItems || fallback.newsItems,
+            hotStocks: data.hotStocks || fallback.hotStocks,
+          });
+        }
+      });
       return { ...fallback, sidebarOpen: false, currentView: 'daily',
         currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }) };
     }
