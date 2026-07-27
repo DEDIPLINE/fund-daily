@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>最小测试页面</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body x-data="{ totalAmount: 0, message: '等待加载...' }" x-init="
+  console.log('开始加载数据...');
+  fetch('data/dashboard.json')
+    .then(resp => {
+      console.log('fetch 状态:', resp.status);
+      if (resp.ok) return resp.json();
+      throw new Error('文件不存在');
+    })
+    .then(data => {
+      console.log('数据加载成功:', data);
+      this.totalAmount = data.summary.totalAmount;
+      this.message = '数据加载成功';
+    })
+    .catch(err => {
+      console.error('数据加载失败:', err);
+      this.message = '数据加载失败: ' + err.message;
+    });
+">
+  <h1>最小测试页面</h1>
+  <p>数据: <span x-text="totalAmount"></span></p>
+  <p>状态: <span x-text="message"></span></p>
+  <p>请打开浏览器控制台查看日志</p>
+</body>
+</html>
