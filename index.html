@@ -519,28 +519,30 @@
         },
       };
       // Try loading real data from dashboard.json
+      // 保存 fallback 对象的引用，以便在 Promise 回调中使用
+      const fallbackRef = fallback;
       loadData().then(data => {
         if (data) {
           const s = data.summary || {};
           // 使用 Alpine.js 的响应式更新方式
-          this.$nextTick(() => {
-            this.totalAmount = s.totalAmount ?? this.totalAmount;
-            this.totalPnl = s.totalPnl ?? this.totalPnl;
-            this.estPnl = s.estPnl ?? this.estPnl;
-            this.estPct = s.estPct ?? this.estPct;
-            this.signals = s.signals || this.signals;
-            this.holdings = data.holdings || this.holdings;
-            this.macroEvents = data.macroEvents || this.macroEvents;
-            this.diag = data.diag || this.diag;
-            this.corrWarnings = data.corrWarnings || this.corrWarnings;
-            this.categoryPie = data.categoryPie || this.categoryPie;
-            this.benchmarkData = data.benchmarkData || this.benchmarkData;
-            this.suggestions = data.suggestions || this.suggestions;
-            this.newsItems = data.newsItems || this.newsItems;
-            this.hotStocks = data.hotStocks || this.hotStocks;
-            this.generatedAt = data.generatedAt || '';
-            this.currentDate = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
-          });
+          // 注意：在 Promise 回调中 this 不指向 Alpine 组件，需要使用 $nextTick
+          // 但这里我们直接更新 fallback 对象，然后让 Alpine 重新渲染
+          fallbackRef.totalAmount = s.totalAmount ?? fallbackRef.totalAmount;
+          fallbackRef.totalPnl = s.totalPnl ?? fallbackRef.totalPnl;
+          fallbackRef.estPnl = s.estPnl ?? fallbackRef.estPnl;
+          fallbackRef.estPct = s.estPct ?? fallbackRef.estPct;
+          fallbackRef.signals = s.signals || fallbackRef.signals;
+          fallbackRef.holdings = data.holdings || fallbackRef.holdings;
+          fallbackRef.macroEvents = data.macroEvents || fallbackRef.macroEvents;
+          fallbackRef.diag = data.diag || fallbackRef.diag;
+          fallbackRef.corrWarnings = data.corrWarnings || fallbackRef.corrWarnings;
+          fallbackRef.categoryPie = data.categoryPie || fallbackRef.categoryPie;
+          fallbackRef.benchmarkData = data.benchmarkData || fallbackRef.benchmarkData;
+          fallbackRef.suggestions = data.suggestions || fallbackRef.suggestions;
+          fallbackRef.newsItems = data.newsItems || fallbackRef.newsItems;
+          fallbackRef.hotStocks = data.hotStocks || fallbackRef.hotStocks;
+          fallbackRef.generatedAt = data.generatedAt || '';
+          fallbackRef.currentDate = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
         }
       });
       return { ...fallback, sidebarOpen: false, currentView: 'daily',
