@@ -40,7 +40,57 @@
     }
   </script>
 </head>
-<body class="dark bg-slate-900 text-slate-200 min-h-screen" x-data="app()" x-init="init()" x-cloak>
+<body class="dark bg-slate-900 text-slate-200 min-h-screen" x-data="{
+  // 初始数据
+  sidebarOpen: false,
+  currentView: 'daily',
+  currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }),
+  navItems: [
+    { id: 'daily', label: '每日日报', icon: '📊', badge: null },
+    { id: 'news', label: '消息面', icon: '📰', badge: 'NEW' },
+    { id: 'diagnosis', label: '持仓诊断', icon: '🩺', badge: null },
+    { id: 'signals', label: '信号总览', icon: '🚦', badge: null },
+  ],
+  totalAmount: 0,
+  totalPnl: 0,
+  estPnl: 0,
+  estPct: 0,
+  signals: { red: 0, yellow: 0, green: 0, tp: 0, anomaly: 0 },
+  holdings: [],
+  macroEvents: [],
+  diag: {},
+  corrWarnings: [],
+  categoryPie: [],
+  benchmarkData: [],
+  suggestions: [],
+  newsItems: [],
+  hotStocks: [],
+  generatedAt: ''
+}" x-init="
+  // 加载数据
+  loadData().then(data => {
+    if (data) {
+      const s = data.summary || {};
+      this.totalAmount = s.totalAmount ?? this.totalAmount;
+      this.totalPnl = s.totalPnl ?? this.totalPnl;
+      this.estPnl = s.estPnl ?? this.estPnl;
+      this.estPct = s.estPct ?? this.estPct;
+      this.signals = s.signals || this.signals;
+      this.holdings = data.holdings || this.holdings;
+      this.macroEvents = data.macroEvents || this.macroEvents;
+      this.diag = data.diag || this.diag;
+      this.corrWarnings = data.corrWarnings || this.corrWarnings;
+      this.categoryPie = data.categoryPie || this.categoryPie;
+      this.benchmarkData = data.benchmarkData || this.benchmarkData;
+      this.suggestions = data.suggestions || this.suggestions;
+      this.newsItems = data.newsItems || this.newsItems;
+      this.hotStocks = data.hotStocks || this.hotStocks;
+      this.generatedAt = data.generatedAt || '';
+    }
+    // 初始化图表
+    this.initCharts();
+  });
+" x-cloak>
 
   <!-- 顶部导航栏 -->
   <header class="fixed top-0 left-0 right-0 h-14 bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 z-50 flex items-center justify-between px-4">
@@ -447,6 +497,7 @@
     }
 
     function app() {
+      // 这个函数现在不会被调用，因为数据直接在 x-init 中初始化
       const fallback = {
         sidebarOpen: false,
         currentView: 'daily',
