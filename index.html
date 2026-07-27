@@ -202,33 +202,35 @@
   generatedAt: ''
 }" x-init="
   // 加载数据
+  const self = this;  // 保存 Alpine.js 组件实例的引用
   Logger.info('开始加载数据');
   loadData().then(data => {
     if (data) {
       Logger.info('数据加载成功', { keys: Object.keys(data) });
       const s = data.summary || {};
-      this.totalAmount = s.totalAmount ?? this.totalAmount;
-      this.totalPnl = s.totalPnl ?? this.totalPnl;
-      this.estPnl = s.estPnl ?? this.estPnl;
-      this.estPct = s.estPct ?? this.estPct;
-      this.signals = s.signals || this.signals;
-      this.holdings = data.holdings || this.holdings;
-      this.macroEvents = data.macroEvents || this.macroEvents;
-      this.diag = data.diag || this.diag;
-      this.corrWarnings = data.corrWarnings || this.corrWarnings;
-      this.categoryPie = data.categoryPie || this.categoryPie;
-      this.benchmarkData = data.benchmarkData || this.benchmarkData;
-      this.suggestions = data.suggestions || this.suggestions;
-      this.newsItems = data.newsItems || this.newsItems;
-      this.hotStocks = data.hotStocks || this.hotStocks;
-      this.generatedAt = data.generatedAt || '';
+      // 使用 self 更新数据，确保 this 上下文正确
+      self.totalAmount = s.totalAmount ?? self.totalAmount;
+      self.totalPnl = s.totalPnl ?? self.totalPnl;
+      self.estPnl = s.estPnl ?? self.estPnl;
+      self.estPct = s.estPct ?? self.estPct;
+      self.signals = s.signals || self.signals;
+      self.holdings = data.holdings || self.holdings;
+      self.macroEvents = data.macroEvents || self.macroEvents;
+      self.diag = data.diag || self.diag;
+      self.corrWarnings = data.corrWarnings || self.corrWarnings;
+      self.categoryPie = data.categoryPie || self.categoryPie;
+      self.benchmarkData = data.benchmarkData || self.benchmarkData;
+      self.suggestions = data.suggestions || self.suggestions;
+      self.newsItems = data.newsItems || self.newsItems;
+      self.hotStocks = data.hotStocks || self.hotStocks;
+      self.generatedAt = data.generatedAt || '';
       Logger.info('数据已更新到组件');
     } else {
       Logger.warn('数据加载失败或为空');
     }
     // 初始化图表
     Logger.info('初始化图表');
-    this.initCharts();
+    self.initCharts();
   }).catch(err => {
     Logger.error('数据加载异常', { error: err.message });
   });
