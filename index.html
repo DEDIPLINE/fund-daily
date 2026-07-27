@@ -388,17 +388,22 @@
                 </thead>
                 <tbody>
                   ${appState.holdings.length > 0 ? appState.holdings.map(h => {
-                    const hPnlClass = h.pnl >= 0 ? 'text-up' : 'text-down';
-                    const hPnlSign = h.pnl >= 0 ? '+' : '';
+                    const hPnlClass = (h.pnl || 0) >= 0 ? 'text-up' : 'text-down';
+                    const hPnlSign = (h.pnl || 0) >= 0 ? '+' : '';
+                    const name = h.shortName || h.name || '未知基金';
+                    const code = h.code || '';
+                    const amount = h.amount || 0;
+                    const pnl = h.pnl || h.gain || 0;
+                    const weight = h.weight || 0;
                     return `
                       <tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
                         <td class="p-3">
-                          <div class="font-medium text-white">${h.name}</div>
-                          <div class="text-xs text-slate-500">${h.code}</div>
+                          <div class="font-medium text-white">${name}</div>
+                          <div class="text-xs text-slate-500">${code}</div>
                         </td>
-                        <td class="p-3">¥${h.amount.toLocaleString()}</td>
-                        <td class="p-3 ${hPnlClass}">${hPnlSign}¥${h.pnl.toLocaleString()}</td>
-                        <td class="p-3">${h.weight}%</td>
+                        <td class="p-3">¥${amount.toLocaleString()}</td>
+                        <td class="p-3 ${hPnlClass}">${hPnlSign}¥${pnl.toLocaleString()}</td>
+                        <td class="p-3">${weight}%</td>
                       </tr>
                     `;
                   }).join('') : '<tr><td colspan="4" class="p-4 text-center text-slate-500">暂无持仓数据</td></tr>'}
