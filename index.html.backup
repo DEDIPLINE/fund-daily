@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>AI 基金助手</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            up: '#ef4444',
+            down: '#22c55e',
+            flat: '#6b7280',
+            dark: { 800: '#1e293b', 700: '#334155', 600: '#475569', 500: '#64748b' },
+            accent: { DEFAULT: '#3b82f6', light: '#60a5fa' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .nav-item { transition: all 0.15s ease; }
+    .nav-item:hover { background: rgba(255,255,255,0.05); }
+    .nav-item.active { background: rgba(255,255,255,0.1); border-left: 3px solid #ef4444; }
+    .view-enter { animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .card-hover { transition: box-shadow 0.15s ease; }
+    .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .spark-line { stroke-dasharray: 300; stroke-dashoffset: 300; animation: drawLine 1s ease forwards; }
+    @keyframes drawLine { to { stroke-dashoffset: 0; } }
+    
+    /* 日志面板样式 */
+    .log-panel { 
+      position: fixed; 
+      bottom: 0; 
+      right: 0; 
+      width: 400px; 
+      height: 300px; 
+      background: rgba(30, 41, 59, 0.95); 
+      border-top-left-radius: 12px; 
+      border: 1px solid rgba(71, 85, 105, 0.5);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.3s ease;
+      transform: translateY(calc(100% - 40px));
+    }
+    .log-panel.expanded {
+      transform: translateY(0);
+    }
+    .log-panel-header {
+      padding: 10px 15px;
+      background: rgba(51, 65, 85, 0.8);
+      border-bottom: 1px solid rgba(71, 85, 105, 0.5);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .log-panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    .log-entry {
+      margin-bottom: 8px;
+      padding: 6px 8px;
+      border-radius: 4px;
+      background: rgba(51, 65, 85, 0.3);
+      word-break: break-all;
+    }
+    .log-entry.log-info { border-left: 3px solid #3b82f6; }
+    .log-entry.log-warn { border-left: 3px solid #f59e0b; }
+    .log-entry.log-error { border-left: 3px solid #ef4444; }
+    .log-time { color: #64748b; font-size: 10px; }
+    .log-level { font-weight: bold; }
+    .log-entry.log-info .log-level { color: #3b82f6; }
+    .log-entry.log-warn .log-level { color: #f59e0b; }
+    .log-entry.log-error .log-level { color: #ef4444; }
+    .log-message { color: #e2e8f0; }
+    .log-data { 
+      margin-top: 4px;
+      padding: 6px;
+      background: rgba(30, 41, 59, 0.5);
+      border-radius: 4px;
+      font-size: 10px;
+      color: #94a3b8;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body class="dark bg-slate-900 text-slate-200 min-h-screen">
+  <div class="flex flex-col md:flex-row">
+    <!-- 侧边栏 -->
+    <aside class="w-full md:w-64 bg-slate-800 border-r border-slate-700 md:h-screen sticky top-0 flex flex-col md:sticky">
+      <div class="p-4 border-b border-slate-700">
+        <h1 class="text-lg font-bold text-white">🤖 AI 基金助手</h1>
+        <div class="text-xs text-slate-400 mt-1" id="current-date"></div>
+      </div>
+      <nav class="flex-1 p-3">
+        <div class="space-y-1" id="nav-items">
+          <!-- 导航项由 JavaScript 动态生成 -->
+        </div>
+      </nav>
+      <div class="p-4 border-t border-slate-700">
+        <div class="text-xs text-slate-500">最后更新：<span id="last-update"></span></div>
+      </div>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="flex-1 p-4 md:p-6">
+      <!-- 视图容器 -->
+      <div id="views-container">
+        <!-- 视图由 JavaScript 动态生成 -->
+      </div>
+    </main>
+  </div>
+
+  <!-- 日志面板 -->
+  <div id="log-panel" class="log-panel">
+    <div class="log-panel-header" onclick="toggleLogPanel()">
+      <span>📝 运行日志 (<span id="log-count">0</span>)</span>
+      <button onclick="event.stopPropagation(); Logger.clear();" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">清空</button>
+    </div>
+    <div id="log-panel-content" class="log-panel-content"></div>
+  </div>
+
+  <script>
+    // 日志系统
+    const Logger = {
+      logs: [],
+      
+      addLog: function(level, message, data = null) {
+        const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        const log = { timestamp, level, message, data };
+        this.logs.push(log);
+        console.log(`[${timestamp}] [${level.toUpperCase()}] ${message}`, data || '');
+        this.updateLogPanel();
+      },
+      
+      info: function(message, data) { this.addLog('info', message, data); },
+      warn: function(message, data) { this.addLog('warn', message, data); },
+      error: function(message, data) { this.addLog('error', message, data); },
+      
+      updateLogPanel: function() {
+        const panel = document.getElementById('log-panel-content');
+        if (panel) {
+          panel.innerHTML = this.logs.map(log =>
+            `<div class="log-entry log-${log.level}">` +
+            `<span class="log-time">${log.timestamp}</span> ` +
+            `<span class="log-level">[${log.level.toUpperCase()}]</span> ` +
+            `<span class="log-message">${log.message}</span>` +
+            (log.data ? `<pre class="log-data">${JSON.stringify(log.data, null, 2)}</pre>` : '') +
+            `</div>`
+          ).join('');
+        }
+        const count = document.getElementById('log-count');
+        if (count) {
+          count.textContent = this.logs.length;
+        }
+      },
+      
+      clear: function() {
+        this.logs = [];
+        this.updateLogPanel();
+        console.clear();
+        this.info('日志已清空');
+      }
+    };
+
+    // 全局错误处理
+    window.onerror = function(msg, url, line, col, error) {
+      Logger.error('JavaScript错误', { msg, url, line, col, error: error?.message });
+      return false;
+    };
+
+    window.onunhandledrejection = function(e) {
+      Logger.error('未处理的Promise拒绝', { reason: e.reason });
+    };
+
+    // 切换日志面板
+    function toggleLogPanel() {
+      const panel = document.getElementById('log-panel');
+      panel.classList.toggle('expanded');
+    }
+
+    // 应用状态
+    const appState = {
+      sidebarOpen: false,
+      currentView: 'daily',
+      currentDate: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }),
+      navItems: [
+        { id: 'daily', label: '每日日报', icon: '📊', badge: null },
+        { id: 'news', label: '消息面', icon: '📰', badge: 'NEW' },
+        { id: 'diagnosis', label: '持仓诊断', icon: '🩺', badge: null },
+        { id: 'signals', label: '信号总览', icon: '🚦', badge: null },
+      ],
+      totalAmount: 0,
+      totalPnl: 0,
+      estPnl: 0,
+      estPct: 0,
+      signals: { red: 0, yellow: 0, green: 0, tp: 0, anomaly: 0 },
+      holdings: [],
+      macroEvents: [],
+      diag: {},
+      corrWarnings: [],
+      categoryPie: [],
+      benchmarkData: [],
+      suggestions: [],
+      newsItems: [],
+      hotStocks: [],
+      generatedAt: '',
+      charts: {}
+    };
+
+    // 数据加载函数
+    async function loadData() {
+      Logger.info('开始加载数据');
+      try {
+        // 尝试从 API 获取（后端模式）
+        Logger.info('尝试连接 API...');
+        const resp = await fetch('/api/dashboard');
+        if (resp.ok) {
+          Logger.info('API 连接成功');
+          const data = await resp.json();
+          Logger.info('API 数据加载成功', { keys: Object.keys(data) });
+          return data;
+        }
+        Logger.warn('API 请求失败，状态码: ' + resp.status);
+      } catch (e) {
+        Logger.warn('API 连接失败（这是正常的，GitHub Pages 没有后端）', { error: e.message });
+      }
+
+      try {
+        // 回退到静态 JSON（离线模式）
+        Logger.info('尝试加载静态数据文件...');
+        const resp2 = await fetch('data/dashboard.json');
+        if (resp2.ok) {
+          Logger.info('静态数据文件加载成功');
+          const data = await resp2.json();
+          Logger.info('静态数据解析成功', { keys: Object.keys(data) });
+          return data;
+        }
+        Logger.warn('静态数据文件请求失败，状态码: ' + resp2.status);
+      } catch (e2) {
+        Logger.error('静态数据文件加载失败', { error: e2.message });
+      }
+
+      Logger.error('所有数据源都不可用');
+      return null;
+    }
+
+    // 渲染导航项
+    function renderNavItems() {
+      const navContainer = document.getElementById('nav-items');
+      if (!navContainer) return;
+      
+      navContainer.innerHTML = appState.navItems.map(item => `
+        <button 
+          onclick="switchView('${item.id}')"
+          class="nav-item w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 ${appState.currentView === item.id ? 'active' : ''}"
+        >
+          <span>${item.icon}</span>
+          <span>${item.label}</span>
+          ${item.badge ? `<span class="ml-auto text-[10px] bg-accent text-white px-1.5 py-0.5 rounded-full">${item.badge}</span>` : ''}
+        </button>
+      `).join('');
+    }
+
+    // 切换视图
+    function switchView(viewId) {
+      try {
+        appState.currentView = viewId;
+        renderNavItems();
+        renderCurrentView();
+        Logger.info('切换到视图: ' + viewId);
+      } catch (error) {
+        Logger.error('视图切换失败', { viewId, error: error.message });
+        console.error('视图切换失败:', error);
+      }
+    }
+
+    // 渲染当前视图
+    function renderCurrentView() {
+      try {
+        const container = document.getElementById('views-container');
+        if (!container) return;
+      
+      // 根据当前视图渲染对应内容
+      switch (appState.currentView) {
+        case 'daily':
+          renderDailyView(container);
+          break;
+        case 'news':
+          renderNewsView(container);
+          break;
+        case 'diagnosis':
+          renderDiagnosisView(container);
+          break;
+        case 'signals':
+          renderSignalsView(container);
+          break;
+        default:
+          container.innerHTML = '<div class="text-center py-10 text-slate-500">视图不存在</div>';
+      }
+      
+      // 初始化图表（如果是诊断视图）
+      if (appState.currentView === 'diagnosis') {
+        setTimeout(() => initCharts(), 100);
+      }
+      } catch (error) {
+        Logger.error('视图渲染失败', { view: appState.currentView, error: error.message });
+        console.error('视图渲染失败:', error);
+        container.innerHTML = '<div class="text-center py-10 text-red-500">视图渲染失败，请刷新页面重试</div>';
+      }
+    }
+
+    // 渲染每日日报视图
+    function renderDailyView(container) {
+      const pnlClass = appState.totalPnl >= 0 ? 'text-up' : 'text-down';
+      const pnlSign = appState.totalPnl >= 0 ? '+' : '';
+      
+      container.innerHTML = `
+        <div class="view-enter">
+          <h2 class="text-xl font-semibold text-white mb-4">📊 每日日报</h2>
+          
+          <!-- 总览卡片 -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            <div class="bg-slate-800 rounded-xl p-4 card-hover">
+              <div class="text-xs text-slate-400">总资产</div>
+              <div class="text-xl font-bold text-white mt-1">¥${appState.totalAmount.toLocaleString()}</div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 card-hover">
+              <div class="text-xs text-slate-400">累计收益</div>
+              <div class="text-xl font-bold ${pnlClass} mt-1">${pnlSign}¥${appState.totalPnl.toLocaleString()}</div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 card-hover">
+              <div class="text-xs text-slate-400">今日预估</div>
+              <div class="text-xl font-bold ${pnlClass} mt-1">${pnlSign}¥${appState.estPnl.toLocaleString()}</div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 card-hover">
+              <div class="text-xs text-slate-400">今日涨幅</div>
+              <div class="text-xl font-bold ${pnlClass} mt-1">${pnlSign}${appState.estPct}%</div>
+            </div>
+          </div>
+          
+          <!-- 信号统计 -->
+          <div class="bg-slate-800 rounded-xl p-4 mb-5">
+            <h3 class="text-sm font-medium text-slate-400 mb-3">信号总览</h3>
+            <div class="flex gap-4 text-sm">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                <span>红色信号: <span class="text-white font-medium">${appState.signals.red}</span></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
+                <span>黄色信号: <span class="text-white font-medium">${appState.signals.yellow}</span></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                <span>绿色信号: <span class="text-white font-medium">${appState.signals.green}</span></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+                <span>止盈信号: <span class="text-white font-medium">${appState.signals.tp}</span></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-purple-500"></span>
+                <span>异常信号: <span class="text-white font-medium">${appState.signals.anomaly}</span></span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 持仓列表 -->
+          <div class="bg-slate-800 rounded-xl overflow-hidden">
+            <h3 class="text-sm font-medium text-slate-400 p-4 border-b border-slate-700">持仓明细</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-left text-slate-400 border-b border-slate-700">
+                    <th class="p-3">基金名称</th>
+                    <th class="p-3">持仓金额</th>
+                    <th class="p-3">今日收益</th>
+                    <th class="p-3">持仓占比</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${appState.holdings.length > 0 ? appState.holdings.map(h => {
+                    const hPnlClass = (h.pnl || 0) >= 0 ? 'text-up' : 'text-down';
+                    const hPnlSign = (h.pnl || 0) >= 0 ? '+' : '';
+                    const name = h.shortName || h.name || '未知基金';
+                    const code = h.code || '';
+                    const amount = h.amount || 0;
+                    const pnl = h.pnl || h.gain || 0;
+                    const weight = h.weight || 0;
+                    return `
+                      <tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
+                        <td class="p-3">
+                          <div class="font-medium text-white">${name}</div>
+                          <div class="text-xs text-slate-500">${code}</div>
+                        </td>
+                        <td class="p-3">¥${amount.toLocaleString()}</td>
+                        <td class="p-3 ${hPnlClass}">${hPnlSign}¥${pnl.toLocaleString()}</td>
+                        <td class="p-3">${weight}%</td>
+                      </tr>
+                    `;
+                  }).join('') : '<tr><td colspan="4" class="p-4 text-center text-slate-500">暂无持仓数据</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 渲染消息面视图
+    function renderNewsView(container) {
+      container.innerHTML = `
+        <div class="view-enter">
+          <h2 class="text-xl font-semibold text-white mb-4">📰 消息面参考卡</h2>
+          
+          <!-- 持仓新闻区 -->
+          <div class="mb-6">
+            <h3 class="text-sm font-medium text-slate-400 mb-3 border-l-2 border-accent pl-3">📌 持仓消息</h3>
+            <div class="grid gap-3 md:grid-cols-2">
+              ${appState.newsItems.slice(0, 6).map(n => `
+                <div class="bg-slate-800 rounded-xl p-4 card-hover border-l-2 border-accent/50">
+                  <div class="flex items-start justify-between gap-2 mb-2">
+                    <h4 class="text-sm font-medium text-white leading-snug">${n.title}</h4>
+                  </div>
+                  <p class="text-xs text-slate-400 line-clamp-2 mb-2">${n.summary}</p>
+                  <div class="flex items-center gap-2 text-[10px] text-slate-500">
+                    <span>${n.source}</span>
+                    <span>·</span>
+                    <span>${n.time}</span>
+                    <span>·</span>
+                    <span class="text-accent-light">${n.tag}</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            ${appState.newsItems.length === 0 ? '<div class="text-slate-500 text-sm py-4 text-center">暂无新闻数据，请先运行 <code class="text-accent-light">python main.py news</code></div>' : ''}
+          </div>
+          
+          <!-- 市场热点 -->
+          <div class="mb-6">
+            <h3 class="text-sm font-medium text-slate-400 mb-3 border-l-2 border-orange-500 pl-3">🔥 市场热点</h3>
+            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              ${appState.hotStocks.map(h => `
+                <div class="bg-slate-800 rounded-xl p-4 card-hover">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-sm font-semibold text-white">${h.name}</span>
+                    ${h.change != null && h.change !== 0 ? `
+                      <span class="text-xs px-1.5 py-0.5 rounded bg-slate-700 ${h.change >= 0 ? 'text-up' : 'text-down'}">
+                        ${(h.change >= 0 ? '+' : '') + (h.change || 0).toFixed(2)}%
+                      </span>
+                    ` : ''}
+                  </div>
+                  <div class="text-xs text-slate-500">关注度 ${(h.followers || 0).toLocaleString()}</div>
+                </div>
+              `).join('')}
+            </div>
+            ${appState.hotStocks.length === 0 ? '<div class="text-slate-500 text-sm py-4 text-center">暂无热点数据</div>' : ''}
+          </div>
+          
+          <!-- 宏观日历 -->
+          <div>
+            <h3 class="text-sm font-medium text-slate-400 mb-3 border-l-2 border-down pl-3">🌐 宏观经济</h3>
+            <div class="bg-slate-800 rounded-xl overflow-hidden">
+              ${appState.macroEvents.slice(0, 8).map(m => `
+                <div class="flex items-center gap-3 px-4 py-2.5 border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30">
+                  <span class="text-xs">${m.importance >= 3 ? '🔴' : (m.importance >= 2 ? '🟡' : '⚪')}</span>
+                  <span class="text-xs text-slate-500 w-12">${m.time}</span>
+                  <span class="text-xs text-slate-500 w-8">${m.region}</span>
+                  <span class="text-sm text-white flex-1">${m.event}</span>
+                  <span class="text-sm font-medium text-right w-16">${m.actual}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 渲染诊断视图
+    function renderDiagnosisView(container) {
+      container.innerHTML = `
+        <div class="view-enter">
+          <h2 class="text-xl font-semibold text-white mb-4">🩺 持仓诊断</h2>
+          
+          <!-- 风险指标卡片 -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            <div class="bg-slate-800 rounded-xl p-4 card-hover">
+              <div class="text-xs text-slate-400">年化波动率</div>
+              <div class="text-xl font-bold text-white mt-1">${appState.diag.volatility || 0}%</div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 card-hover">
+              <div class="text-xs text-slate-400">最大回撤</div>
+              <div class="text-xl font-bold text-down mt-1">${appState.diag.mdd || 0}%</div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 card-hover">
+              <div class="text-xs text-slate-400">夏普比率</div>
+              <div class="text-xl font-bold text-white mt-1">${appState.diag.sharpe || 0}</div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 card-hover">
+              <div class="text-xs text-slate-400">HHI 集中度</div>
+              <div class="text-xl font-bold mt-1 ${appState.diag.hhi > 0.15 ? 'text-up' : 'text-white'}">${appState.diag.hhi || 0}</div>
+            </div>
+          </div>
+          
+          <!-- 分类占比 + 基准对比 -->
+          <div class="grid md:grid-cols-2 gap-4 mb-5">
+            <div class="bg-slate-800 rounded-xl p-4">
+              <h3 class="text-sm font-medium text-slate-400 mb-3">分类占比</h3>
+              <div id="chart-category" style="height: 240px;"></div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4">
+              <h3 class="text-sm font-medium text-slate-400 mb-3">基准对比</h3>
+              <div id="chart-benchmark" style="height: 240px;"></div>
+            </div>
+          </div>
+          
+          <!-- 相关性警告 -->
+          ${appState.corrWarnings.length > 0 ? `
+            <div class="bg-slate-800 rounded-xl p-4 mb-5">
+              <h3 class="text-sm font-medium text-slate-400 mb-3">⚠️ 相关性警告</h3>
+              <div class="space-y-2">
+                ${appState.corrWarnings.map(w => `
+                  <div class="text-sm text-slate-300 bg-slate-700/50 p-3 rounded-lg">
+                    ${w}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+          
+          <!-- 优化建议 -->
+          ${appState.suggestions.length > 0 ? `
+            <div class="bg-slate-800 rounded-xl p-4">
+              <h3 class="text-sm font-medium text-slate-400 mb-3">💡 优化建议</h3>
+              <div class="space-y-2">
+                ${appState.suggestions.map(s => `
+                  <div class="text-sm text-slate-300 bg-slate-700/50 p-3 rounded-lg">
+                    ${s}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // 渲染信号视图
+    function renderSignalsView(container) {
+      container.innerHTML = `
+        <div class="view-enter">
+          <h2 class="text-xl font-semibold text-white mb-4">🚦 信号总览</h2>
+          
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            <div class="bg-slate-800 rounded-xl p-4 card-hover border-l-4 border-red-500">
+              <div class="text-xs text-slate-400">红色信号</div>
+              <div class="text-xl font-bold text-red-500 mt-1">${appState.signals.red}</div>
+              <div class="text-xs text-slate-500 mt-1">需要立即处理</div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 card-hover border-l-4 border-yellow-500">
+              <div class="text-xs text-slate-400">黄色信号</div>
+              <div class="text-xl font-bold text-yellow-500 mt-1">${appState.signals.yellow}</div>
+              <div class="text-xs text-slate-500 mt-1">需要关注</div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 card-hover border-l-4 border-green-500">
+              <div class="text-xs text-slate-400">绿色信号</div>
+              <div class="text-xl font-bold text-green-500 mt-1">${appState.signals.green}</div>
+              <div class="text-xs text-slate-500 mt-1">状态良好</div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 card-hover border-l-4 border-blue-500">
+              <div class="text-xs text-slate-400">止盈信号</div>
+              <div class="text-xl font-bold text-blue-500 mt-1">${appState.signals.tp}</div>
+              <div class="text-xs text-slate-500 mt-1">建议止盈</div>
+            </div>
+          </div>
+          
+          <div class="bg-slate-800 rounded-xl p-4">
+            <h3 class="text-sm font-medium text-slate-400 mb-3">信号说明</h3>
+            <div class="text-sm text-slate-300 space-y-2">
+              <p>• <span class="text-red-500 font-medium">红色信号</span>：持仓出现重大风险，建议立即处理</p>
+              <p>• <span class="text-yellow-500 font-medium">黄色信号</span>：持仓出现潜在风险，建议关注</p>
+              <p>• <span class="text-green-500 font-medium">绿色信号</span>：持仓状态良好，无需操作</p>
+              <p>• <span class="text-blue-500 font-medium">止盈信号</span>：持仓达到止盈目标，建议部分止盈</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 初始化图表
+    function initCharts() {
+      if (appState.currentView !== 'diagnosis') return;
+      
+      // 分类占比饼图
+      const catEl = document.getElementById('chart-category');
+      if (catEl && !catEl._chart) {
+        const chart1 = echarts.init(catEl, 'dark');
+        catEl._chart = chart1;
+        chart1.setOption({
+          backgroundColor: 'transparent',
+          tooltip: { trigger: 'item', formatter: '{b}: {d}%' },
+          series: [{
+            type: 'pie',
+            radius: ['40%', '70%'],
+            avoidLabelOverlap: false,
+            itemStyle: { borderRadius: 10, borderColor: '#1e293b', borderWidth: 2 },
+            label: { show: false, position: 'center' },
+            emphasis: {
+              label: { show: true, fontSize: '18', fontWeight: 'bold' }
+            },
+            labelLine: { show: false },
+            data: appState.categoryPie.length ? appState.categoryPie : [{ name: '暂无数据', value: 1 }]
+          }]
+        });
+      }
+      
+      // 基准对比柱状图
+      const benchEl = document.getElementById('chart-benchmark');
+      if (benchEl && !benchEl._chart) {
+        const chart2 = echarts.init(benchEl, 'dark');
+        benchEl._chart = chart2;
+        const bd = appState.benchmarkData;
+        chart2.setOption({
+          backgroundColor: 'transparent',
+          tooltip: { trigger: 'axis' },
+          xAxis: { type: 'category', data: bd.categories.length ? bd.categories : ['暂无'], axisLabel: { color: '#94a3b8' }, axisLine: { lineStyle: { color: '#334155' } } },
+          yAxis: [
+            { type: 'value', name: '夏普/年化%', axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: '#1e293b' } } },
+          ],
+          series: [
+            { name: '夏普比率', type: 'bar', barWidth: 30, data: bd.sharpe.length ? bd.sharpe : [0], itemStyle: { color: '#3b82f6', borderRadius: [4,4,0,0] } },
+            { name: '年化波动率%', type: 'bar', barWidth: 30, data: bd.volatility.length ? bd.volatility : [0], itemStyle: { color: '#ef4444', borderRadius: [4,4,0,0] } },
+          ],
+          legend: { textStyle: { color: '#94a3b8', fontSize: 11 }, top: 0 }
+        });
+      }
+    }
+
+    // 初始化应用
+    async function initApp() {
+      Logger.info('开始初始化应用');
+      
+      // 渲染日期
+      const dateEl = document.getElementById('current-date');
+      if (dateEl) dateEl.textContent = appState.currentDate;
+      
+      // 渲染导航
+      renderNavItems();
+      
+      // 加载数据
+      const data = await loadData();
+      if (data) {
+        Logger.info('数据加载成功，更新应用状态');
+        const s = data.summary || {};
+        
+        // 更新状态
+        appState.totalAmount = s.totalAmount ?? appState.totalAmount;
+        appState.totalPnl = s.totalPnl ?? appState.totalPnl;
+        appState.estPnl = s.estPnl ?? appState.estPnl;
+        appState.estPct = s.estPct ?? appState.estPct;
+        appState.signals = s.signals || appState.signals;
+        appState.holdings = data.holdings || appState.holdings;
+        appState.macroEvents = data.macroEvents || appState.macroEvents;
+        appState.diag = data.diag || appState.diag;
+        appState.corrWarnings = data.corrWarnings || appState.corrWarnings;
+        appState.categoryPie = data.categoryPie || appState.categoryPie;
+        appState.benchmarkData = data.benchmarkData || appState.benchmarkData;
+        appState.suggestions = data.suggestions || appState.suggestions;
+        appState.newsItems = data.newsItems || appState.newsItems;
+        appState.hotStocks = data.hotStocks || appState.hotStocks;
+        appState.generatedAt = data.generatedAt || '';
+        
+        // 更新最后更新时间
+        const updateEl = document.getElementById('last-update');
+        if (updateEl) updateEl.textContent = appState.generatedAt;
+        
+        Logger.info('应用状态已更新');
+      } else {
+        Logger.warn('数据加载失败，使用默认数据');
+      }
+      
+      // 渲染当前视图
+      renderCurrentView();
+      
+      Logger.info('应用初始化完成');
+    }
+
+    // 启动应用
+    initApp();
+  </script>
+</body>
+</html>

@@ -100,6 +100,84 @@
       color: #94a3b8;
       white-space: pre-wrap;
     }
+
+    /* 持仓分析页面专用样式 - 适配深色主题 */
+    .analysis-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .analysis-card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      border-left: 4px solid #3b82f6;
+    }
+
+    .adjustment-positive {
+      color: #10b981;
+      font-weight: 600;
+    }
+
+    .adjustment-negative {
+      color: #ef4444;
+      font-weight: 600;
+    }
+
+    .adjustment-new {
+      color: #f59e0b;
+      font-weight: 600;
+    }
+
+    .signal-card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .signal-red { border-left: 4px solid #ef4444; }
+    .signal-yellow { border-left: 4px solid #f59e0b; }
+    .signal-green { border-left: 4px solid #10b981; }
+    .signal-blue { border-left: 4px solid #3b82f6; }
+
+    /* 表格样式适配深色主题 */
+    .bg-white { background-color: #1e293b; }
+    .text-gray-800 { color: #f1f5f9; }
+    .text-gray-600 { color: #94a3b8; }
+    .text-gray-500 { color: #64748b; }
+    .bg-gray-100 { background-color: #334155; }
+    .bg-gray-50 { background-color: #1e293b; }
+    .border-gray-200 { border-color: #334155; }
+    .border-gray-100 { border-color: #334155; }
+    .hover\:bg-gray-50:hover { background-color: #334155; }
+
+    /* 卡片背景适配 */
+    .bg-blue-50 { background-color: #1e3a5f; }
+    .bg-green-50 { background-color: #1e3a2f; }
+    .bg-yellow-50 { background-color: #3a3a1e; }
+    .bg-red-50 { background-color: #3a1e1e; }
+    .bg-purple-50 { background-color: #2d1e3a; }
+    .bg-blue-100 { background-color: #1e3a5f; }
+    .bg-green-100 { background-color: #1e3a2f; }
+    .bg-yellow-100 { background-color: #3a3a1e; }
+    .bg-red-100 { background-color: #3a1e1e; }
+
+    /* 文字颜色适配 */
+    .text-blue-800 { color: #60a5fa; }
+    .text-blue-600 { color: #93c5fd; }
+    .text-blue-500 { color: #60a5fa; }
+    .text-blue-200 { color: #bfdbfe; }
+    .text-green-800 { color: #4ade80; }
+    .text-green-600 { color: #86efac; }
+    .text-green-500 { color: #4ade80; }
+    .text-yellow-800 { color: #fbbf24; }
+    .text-yellow-600 { color: #fcd34d; }
+    .text-red-800 { color: #f87171; }
+    .text-red-600 { color: #fca5a5; }
+    .text-purple-600 { color: #c084fc; }
+    .text-purple-500 { color: #a855f7; }
+    .text-purple-800 { color: #d8b4fe; }
   </style>
 </head>
 <body class="dark bg-slate-900 text-slate-200 min-h-screen">
@@ -205,8 +283,7 @@
       navItems: [
         { id: 'daily', label: '每日日报', icon: '📊', badge: null },
         { id: 'news', label: '消息面', icon: '📰', badge: 'NEW' },
-        { id: 'diagnosis', label: '持仓诊断', icon: '🩺', badge: null },
-        { id: 'signals', label: '信号总览', icon: '🚦', badge: null },
+        { id: 'analysis', label: '持仓分析', icon: '📈', badge: null },
       ],
       totalAmount: 0,
       totalPnl: 0,
@@ -223,7 +300,43 @@
       newsItems: [],
       hotStocks: [],
       generatedAt: '',
-      charts: {}
+      charts: {},
+      analysis: {
+        meta: {
+          reportDate: new Date().toLocaleDateString('zh-CN'),
+          totalValue: 0,
+          currency: 'CNY'
+        },
+        summary: {
+          currentSectors: 0,
+          suggestedSectors: 0,
+          hhiCurrent: 0,
+          hhiSuggested: 0,
+          majorAdjustments: 0,
+          adjustmentTypes: {
+            increase: 0,
+            decrease: 0,
+            new: 0
+          }
+        },
+        chartData: {
+          xAxis: [],
+          current: [],
+          suggested: []
+        },
+        comparisonTable: [],
+        configurationNotes: {
+          currentConfig: {},
+          suggestedConfig: {},
+          adjustmentPrinciples: []
+        },
+        actionItems: [],
+        signalOverview: {
+          summary: {},
+          details: [],
+          timeline: {}
+        }
+      }
     };
 
     // 数据加载函数
@@ -237,6 +350,18 @@
           Logger.info('API 连接成功');
           const data = await resp.json();
           Logger.info('API 数据加载成功', { keys: Object.keys(data) });
+
+          // 尝试加载分析数据
+          try {
+            const analysisResp = await fetch('/data/analysis_frontend.json');
+            if (analysisResp.ok) {
+              data.analysis = await analysisResp.json();
+              Logger.info('分析数据加载成功');
+            }
+          } catch (e) {
+            Logger.warn('分析数据加载失败', { error: e.message });
+          }
+
           return data;
         }
         Logger.warn('API 请求失败，状态码: ' + resp.status);
@@ -252,6 +377,18 @@
           Logger.info('静态数据文件加载成功');
           const data = await resp2.json();
           Logger.info('静态数据解析成功', { keys: Object.keys(data) });
+
+          // 尝试加载分析数据
+          try {
+            const analysisResp2 = await fetch('data/analysis_frontend.json');
+            if (analysisResp2.ok) {
+              data.analysis = await analysisResp2.json();
+              Logger.info('分析数据加载成功');
+            }
+          } catch (e2) {
+            Logger.warn('分析数据加载失败', { error: e2.message });
+          }
+
           return data;
         }
         Logger.warn('静态数据文件请求失败，状态码: ' + resp2.status);
@@ -307,18 +444,15 @@
         case 'news':
           renderNewsView(container);
           break;
-        case 'diagnosis':
-          renderDiagnosisView(container);
-          break;
-        case 'signals':
-          renderSignalsView(container);
+        case 'analysis':
+          renderAnalysisView(container);
           break;
         default:
           container.innerHTML = '<div class="text-center py-10 text-slate-500">视图不存在</div>';
       }
-      
-      // 初始化图表（如果是诊断视图）
-      if (appState.currentView === 'diagnosis') {
+
+      // 初始化图表（如果是分析视图）
+      if (appState.currentView === 'analysis') {
         setTimeout(() => initCharts(), 100);
       }
       } catch (error) {
@@ -495,164 +629,577 @@
       `;
     }
 
-    // 渲染诊断视图
-    function renderDiagnosisView(container) {
+    // 渲染持仓分析视图
+    function renderAnalysisView(container) {
       container.innerHTML = `
         <div class="view-enter">
-          <h2 class="text-xl font-semibold text-white mb-4">🩺 持仓诊断</h2>
-          
-          <!-- 风险指标卡片 -->
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-            <div class="bg-slate-800 rounded-xl p-4 card-hover">
-              <div class="text-xs text-slate-400">年化波动率</div>
-              <div class="text-xl font-bold text-white mt-1">${appState.diag.volatility || 0}%</div>
-            </div>
-            <div class="bg-slate-800 rounded-xl p-4 card-hover">
-              <div class="text-xs text-slate-400">最大回撤</div>
-              <div class="text-xl font-bold text-down mt-1">${appState.diag.mdd || 0}%</div>
-            </div>
-            <div class="bg-slate-800 rounded-xl p-4 card-hover">
-              <div class="text-xs text-slate-400">夏普比率</div>
-              <div class="text-xl font-bold text-white mt-1">${appState.diag.sharpe || 0}</div>
-            </div>
-            <div class="bg-slate-800 rounded-xl p-4 card-hover">
-              <div class="text-xs text-slate-400">HHI 集中度</div>
-              <div class="text-xl font-bold mt-1 ${appState.diag.hhi > 0.15 ? 'text-up' : 'text-white'}">${appState.diag.hhi || 0}</div>
-            </div>
+          <!-- 1. Header区域 -->
+          <div class="analysis-header rounded-xl p-6 mb-6">
+            <h1 class="text-2xl font-bold text-white">📊 持仓分析报告</h1>
+            <p class="text-blue-100 mt-2">基于实时市场动态的持仓结构分析、风险评估和优化建议</p>
+            <div class="text-blue-200 text-sm mt-3">报告日期：${appState.analysis.meta.reportDate} | 总市值：¥${appState.analysis.meta.totalValue.toFixed(2)}</div>
           </div>
-          
-          <!-- 分类占比 + 基准对比 -->
-          <div class="grid md:grid-cols-2 gap-4 mb-5">
-            <div class="bg-slate-800 rounded-xl p-4">
-              <h3 class="text-sm font-medium text-slate-400 mb-3">分类占比</h3>
-              <div id="chart-category" style="height: 240px;"></div>
-            </div>
-            <div class="bg-slate-800 rounded-xl p-4">
-              <h3 class="text-sm font-medium text-slate-400 mb-3">基准对比</h3>
-              <div id="chart-benchmark" style="height: 240px;"></div>
-            </div>
-          </div>
-          
-          <!-- 相关性警告 -->
-          ${appState.corrWarnings.length > 0 ? `
-            <div class="bg-slate-800 rounded-xl p-4 mb-5">
-              <h3 class="text-sm font-medium text-slate-400 mb-3">⚠️ 相关性警告</h3>
-              <div class="space-y-2">
-                ${appState.corrWarnings.map(w => `
-                  <div class="text-sm text-slate-300 bg-slate-700/50 p-3 rounded-lg">
-                    ${w}
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          ` : ''}
-          
-          <!-- 优化建议 -->
-          ${appState.suggestions.length > 0 ? `
-            <div class="bg-slate-800 rounded-xl p-4">
-              <h3 class="text-sm font-medium text-slate-400 mb-3">💡 优化建议</h3>
-              <div class="space-y-2">
-                ${appState.suggestions.map(s => `
-                  <div class="text-sm text-slate-300 bg-slate-700/50 p-3 rounded-lg">
-                    ${s}
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          ` : ''}
-        </div>
-      `;
-    }
 
-    // 渲染信号视图
-    function renderSignalsView(container) {
-      container.innerHTML = `
-        <div class="view-enter">
-          <h2 class="text-xl font-semibold text-white mb-4">🚦 信号总览</h2>
-          
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-            <div class="bg-slate-800 rounded-xl p-4 card-hover border-l-4 border-red-500">
-              <div class="text-xs text-slate-400">红色信号</div>
-              <div class="text-xl font-bold text-red-500 mt-1">${appState.signals.red}</div>
-              <div class="text-xs text-slate-500 mt-1">需要立即处理</div>
+          <!-- 2. Executive Summary -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="analysis-card border-l-4 border-blue-500">
+              <div class="text-xs text-slate-500">当前板块</div>
+              <div class="text-2xl font-bold text-blue-600 mt-1">${appState.analysis.summary.currentSectors}</div>
+              <div class="text-xs text-slate-400 mt-1">个板块</div>
             </div>
-            <div class="bg-slate-800 rounded-xl p-4 card-hover border-l-4 border-yellow-500">
-              <div class="text-xs text-slate-400">黄色信号</div>
-              <div class="text-xl font-bold text-yellow-500 mt-1">${appState.signals.yellow}</div>
-              <div class="text-xs text-slate-500 mt-1">需要关注</div>
+            <div class="analysis-card border-l-4 border-green-500">
+              <div class="text-xs text-slate-500">建议板块</div>
+              <div class="text-2xl font-bold text-green-600 mt-1">${appState.analysis.summary.suggestedSectors}</div>
+              <div class="text-xs text-slate-400 mt-1">个板块</div>
             </div>
-            <div class="bg-slate-800 rounded-xl p-4 card-hover border-l-4 border-green-500">
-              <div class="text-xs text-slate-400">绿色信号</div>
-              <div class="text-xl font-bold text-green-500 mt-1">${appState.signals.green}</div>
-              <div class="text-xs text-slate-500 mt-1">状态良好</div>
+            <div class="analysis-card border-l-4 border-purple-500">
+              <div class="text-xs text-slate-500">集中度 (HHI)</div>
+              <div class="text-2xl font-bold text-purple-600 mt-1">${appState.analysis.summary.hhiCurrent.toFixed(4)}</div>
+              <div class="text-xs text-slate-400 mt-1">建议: ${appState.analysis.summary.hhiSuggested.toFixed(4)}</div>
             </div>
-            <div class="bg-slate-800 rounded-xl p-4 card-hover border-l-4 border-blue-500">
-              <div class="text-xs text-slate-400">止盈信号</div>
-              <div class="text-xl font-bold text-blue-500 mt-1">${appState.signals.tp}</div>
-              <div class="text-xs text-slate-500 mt-1">建议止盈</div>
+            <div class="analysis-card border-l-4 border-orange-500">
+              <div class="text-xs text-slate-500">重大调整</div>
+              <div class="text-2xl font-bold text-orange-600 mt-1">${appState.analysis.summary.majorAdjustments}</div>
+              <div class="text-xs text-slate-400 mt-1">个板块需要调整</div>
             </div>
           </div>
-          
-          <div class="bg-slate-800 rounded-xl p-4">
-            <h3 class="text-sm font-medium text-slate-400 mb-3">信号说明</h3>
-            <div class="text-sm text-slate-300 space-y-2">
-              <p>• <span class="text-red-500 font-medium">红色信号</span>：持仓出现重大风险，建议立即处理</p>
-              <p>• <span class="text-yellow-500 font-medium">黄色信号</span>：持仓出现潜在风险，建议关注</p>
-              <p>• <span class="text-green-500 font-medium">绿色信号</span>：持仓状态良好，无需操作</p>
-              <p>• <span class="text-blue-500 font-medium">止盈信号</span>：持仓达到止盈目标，建议部分止盈</p>
+
+          <!-- 3. Chart Section -->
+          <div class="bg-slate-800 rounded-xl p-6 mb-6 shadow-lg">
+            <h2 class="text-lg font-semibold text-white mb-4">📈 配置对比分析</h2>
+            <div id="analysis-chart" style="height: 400px;"></div>
+          </div>
+
+          <!-- 4. Comparison Table -->
+          <div class="bg-slate-800 rounded-xl p-6 mb-6 shadow-lg">
+            <h2 class="text-lg font-semibold text-white mb-4">📋 详细对比表</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="bg-slate-700">
+                    <th class="p-3 text-left font-semibold text-slate-300">板块</th>
+                    <th class="p-3 text-right font-semibold text-slate-300">当前配置</th>
+                    <th class="p-3 text-right font-semibold text-slate-300">建议配置</th>
+                    <th class="p-3 text-right font-semibold text-slate-300">调整幅度</th>
+                    <th class="p-3 text-center font-semibold text-slate-300">调整类型</th>
+                    <th class="p-3 text-left font-semibold text-slate-300">调整理由</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${appState.analysis.comparisonTable.map(item => `
+                    <tr class="border-b border-slate-700 hover:bg-slate-700/50">
+                      <td class="p-3 font-medium text-white">${item.sector}</td>
+                      <td class="p-3 text-right text-slate-300">${item.current.toFixed(1)}%</td>
+                      <td class="p-3 text-right text-slate-300">${item.suggested.toFixed(1)}%</td>
+                      <td class="p-3 text-right font-medium ${item.adjustment > 0 ? 'adjustment-positive' : item.adjustment < 0 ? 'adjustment-negative' : ''}">${item.adjustment > 0 ? '+' : ''}${item.adjustment.toFixed(1)}%</td>
+                      <td class="p-3 text-center">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                          item.type === 'increase_large' ? 'bg-green-900/50 text-green-300' :
+                          item.type === 'increase' ? 'bg-green-900/30 text-green-400' :
+                          item.type === 'decrease_large' ? 'bg-red-900/50 text-red-300' :
+                          item.type === 'decrease' ? 'bg-red-900/30 text-red-400' :
+                          item.type === 'new' ? 'bg-yellow-900/50 text-yellow-300' :
+                          'bg-slate-700 text-slate-300'
+                        }">${item.typeText}</span>
+                      </td>
+                      <td class="p-3 text-slate-400 text-xs">${item.reason}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
             </div>
+          </div>
+
+          <!-- 5. Configuration Notes -->
+          <div class="grid md:grid-cols-2 gap-6 mb-6">
+            <div class="bg-slate-800 rounded-xl p-6 shadow-lg">
+              <h2 class="text-lg font-semibold text-white mb-4">📝 配置说明</h2>
+              <div class="space-y-4">
+                <div class="p-4 bg-blue-900/30 rounded-lg">
+                  <h3 class="font-medium text-blue-300">当前配置</h3>
+                  <p class="text-sm text-blue-200 mt-1">${appState.analysis.configurationNotes.currentConfig.description || '基于实际持仓'}</p>
+                  <div class="text-xs text-blue-400 mt-2">板块数: ${appState.analysis.configurationNotes.currentConfig.sectors || 0} | 特点: ${appState.analysis.configurationNotes.currentConfig.characteristics || '集中度较高'}</div>
+                </div>
+                <div class="p-4 bg-green-900/30 rounded-lg">
+                  <h3 class="font-medium text-green-300">建议配置</h3>
+                  <p class="text-sm text-green-200 mt-1">${appState.analysis.configurationNotes.suggestedConfig.description || '基于市场动态'}</p>
+                  <div class="text-xs text-green-400 mt-2">板块数: ${appState.analysis.configurationNotes.suggestedConfig.sectors || 0} | 特点: ${appState.analysis.configurationNotes.suggestedConfig.characteristics || '风险分散优化'}</div>
+                </div>
+              </div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-6 shadow-lg">
+              <h2 class="text-lg font-semibold text-white mb-4">⚙️ 调整原则</h2>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr class="bg-slate-700">
+                      <th class="p-2 text-left font-semibold text-slate-300">原则</th>
+                      <th class="p-2 text-left font-semibold text-slate-300">措施</th>
+                      <th class="p-2 text-left font-semibold text-slate-300">预期效果</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${appState.analysis.configurationNotes.adjustmentPrinciples.map(item => `
+                      <tr class="border-b border-slate-700">
+                        <td class="p-2 font-medium text-white">${item.principle}</td>
+                        <td class="p-2 text-slate-300">${item.measure}</td>
+                        <td class="p-2 text-slate-300">${item.effect}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. Action Items -->
+          <div class="grid md:grid-cols-3 gap-4 mb-6">
+            ${appState.analysis.actionItems.map(item => `
+              <div class="bg-slate-800 rounded-xl p-5 shadow-lg border-l-4 ${
+                item.timeframe === 'short' ? 'border-red-500' :
+                item.timeframe === 'medium' ? 'border-yellow-500' :
+                'border-green-500'
+              }">
+                <div class="text-xs text-slate-500 mb-2">${item.label}</div>
+                <div class="text-lg font-bold text-white mb-2">${item.action}</div>
+                <p class="text-sm text-slate-300">${item.description}</p>
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- 7. Signal Overview -->
+          <div class="bg-slate-800 rounded-xl p-6 mb-6 shadow-lg">
+            <h2 class="text-lg font-semibold text-white mb-4">🚦 信号总览</h2>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+              <div class="signal-card signal-red">
+                <div class="text-xs text-slate-500">红色信号</div>
+                <div class="text-xl font-bold text-red-500 mt-1">${appState.signals.red}</div>
+                <div class="text-xs text-slate-400 mt-1">需要立即处理</div>
+              </div>
+              <div class="signal-card signal-yellow">
+                <div class="text-xs text-slate-500">黄色信号</div>
+                <div class="text-xl font-bold text-yellow-500 mt-1">${appState.signals.yellow}</div>
+                <div class="text-xs text-slate-400 mt-1">需要关注</div>
+              </div>
+              <div class="signal-card signal-green">
+                <div class="text-xs text-slate-500">绿色信号</div>
+                <div class="text-xl font-bold text-green-500 mt-1">${appState.signals.green}</div>
+                <div class="text-xs text-slate-400 mt-1">状态良好</div>
+              </div>
+              <div class="signal-card signal-blue">
+                <div class="text-xs text-slate-500">止盈信号</div>
+                <div class="text-xl font-bold text-blue-500 mt-1">${appState.signals.tp}</div>
+                <div class="text-xs text-slate-400 mt-1">建议止盈</div>
+              </div>
+              <div class="signal-card" style="border-left: 4px solid #8b5cf6;">
+                <div class="text-xs text-slate-500">异动预警</div>
+                <div class="text-xl font-bold text-purple-500 mt-1">${appState.signals.anomaly}</div>
+                <div class="text-xs text-slate-400 mt-1">异常波动</div>
+              </div>
+            </div>
+            
+            <!-- 信号说明 -->
+            <div class="p-4 bg-slate-700/50 rounded-lg">
+              <h3 class="font-medium text-slate-300 mb-2">信号说明</h3>
+              <div class="grid md:grid-cols-2 gap-2 text-sm text-slate-400">
+                <p>• <span class="text-red-400 font-medium">红色信号</span>：持仓出现重大风险，建议立即处理</p>
+                <p>• <span class="text-yellow-400 font-medium">黄色信号</span>：持仓出现潜在风险，建议关注</p>
+                <p>• <span class="text-green-400 font-medium">绿色信号</span>：持仓状态良好，无需操作</p>
+                <p>• <span class="text-blue-400 font-medium">止盈信号</span>：持仓达到止盈目标，建议部分止盈</p>
+                <p>• <span class="text-purple-400 font-medium">异动预警</span>：单日跌幅>3%或连跌≥3日</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 8. Disclaimer -->
+          <div class="bg-blue-900/30 rounded-xl p-4 mb-6">
+            <p class="text-sm text-blue-200 italic">
+              本报告基于公开市场信息分析，仅供参考，不构成任何投资建议。投资有风险，入市需谨慎。实际投资决策应基于个人的风险承受能力和投资目标。数据来源：akshare、腾讯自选股MCP。
+            </p>
+          </div>
+
+          <!-- 9. Footer -->
+          <div class="text-center text-slate-500 text-sm py-4 border-t border-slate-700">
+            <p>© 2026 AI 基金助手 | 数据来源：akshare、腾讯自选股MCP | 生成时间：${appState.generatedAt || '未知'}</p>
           </div>
         </div>
       `;
+      
+      // 初始化图表
+      setTimeout(() => initAnalysisChart(), 100);
     }
 
     // 初始化图表
     function initCharts() {
-      if (appState.currentView !== 'diagnosis') return;
-      
-      // 分类占比饼图
-      const catEl = document.getElementById('chart-category');
-      if (catEl && !catEl._chart) {
-        const chart1 = echarts.init(catEl, 'dark');
-        catEl._chart = chart1;
-        chart1.setOption({
-          backgroundColor: 'transparent',
-          tooltip: { trigger: 'item', formatter: '{b}: {d}%' },
-          series: [{
-            type: 'pie',
-            radius: ['40%', '70%'],
-            avoidLabelOverlap: false,
-            itemStyle: { borderRadius: 10, borderColor: '#1e293b', borderWidth: 2 },
-            label: { show: false, position: 'center' },
-            emphasis: {
-              label: { show: true, fontSize: '18', fontWeight: 'bold' }
-            },
-            labelLine: { show: false },
-            data: appState.categoryPie.length ? appState.categoryPie : [{ name: '暂无数据', value: 1 }]
-          }]
+      // 此函数保留但不再使用，因为diagnosis视图已移除
+    }
+
+    // 初始化分析图表
+    function initAnalysisChart() {
+      if (appState.currentView !== 'analysis') return;
+
+      const chartEl = document.getElementById('analysis-chart');
+      if (!chartEl) return;
+
+      // 如果图表已存在，先销毁
+      if (chartEl._chart) {
+        chartEl._chart.dispose();
+      }
+
+      const chart = echarts.init(chartEl, 'dark');
+      chartEl._chart = chart;
+
+      const chartData = appState.analysis.chartData;
+      const option = {
+        backgroundColor: 'transparent',
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' }
+        },
+        legend: {
+          data: ['当前配置', '建议配置'],
+          textStyle: { color: '#94a3b8', fontSize: 12 },
+          top: 0
+        },
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '3%',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'category',
+          data: chartData.xAxis.length ? chartData.xAxis : ['暂无数据'],
+          axisLabel: {
+            color: '#94a3b8',
+            rotate: 45,
+            fontSize: 11
+          },
+          axisLine: { lineStyle: { color: '#334155' } }
+        },
+        yAxis: {
+          type: 'value',
+          name: '配置比例 (%)',
+          axisLabel: {
+            color: '#94a3b8',
+            formatter: '{value}%'
+          },
+          splitLine: { lineStyle: { color: '#1e293b' } }
+        },
+        series: [
+          {
+            name: '当前配置',
+            type: 'bar',
+            barWidth: 30,
+            data: chartData.current.length ? chartData.current : [0],
+            itemStyle: {
+              color: '#3b82f6',
+              borderRadius: [4, 4, 0, 0]
+            }
+          },
+          {
+            name: '建议配置',
+            type: 'bar',
+            barWidth: 30,
+            data: chartData.suggested.length ? chartData.suggested : [0],
+            itemStyle: {
+              color: '#10b981',
+              borderRadius: [4, 4, 0, 0]
+            }
+          }
+        ]
+      };
+
+      chart.setOption(option);
+
+      // 响应式调整
+      window.addEventListener('resize', () => {
+        chart.resize();
+      });
+    }
+
+    // 从现有数据生成分析数据
+    function generateAnalysisFromExistingData() {
+      Logger.info('从现有数据生成分析数据');
+      Logger.info('当前holdings数据', { holdings: appState.holdings });
+
+      // 1. 计算当前板块配置
+      const sectorWeights = {};
+      let totalValue = 0;
+
+      appState.holdings.forEach(holding => {
+        const category = holding.category || '其他';
+        sectorWeights[category] = (sectorWeights[category] || 0) + (holding.amount || 0);
+        totalValue += holding.amount || 0;
+        Logger.info('处理持仓', { holding, category, amount: holding.amount });
+      });
+
+      Logger.info('板块权重计算完成', { sectorWeights, totalValue });
+
+      // 转换为百分比
+      const currentConfig = {};
+      Object.keys(sectorWeights).forEach(sector => {
+        currentConfig[sector] = totalValue > 0 ? (sectorWeights[sector] / totalValue * 100) : 0;
+        Logger.info('板块配置', { sector, weight: sectorWeights[sector], percentage: currentConfig[sector] });
+      });
+
+      Logger.info('当前配置计算完成', { currentConfig });
+
+      // 2. 生成建议配置（基于风险分散原则）
+      const suggestedConfig = generateSuggestedConfig(currentConfig);
+
+      // 3. 计算调整幅度
+      const allSectors = [...new Set([...Object.keys(currentConfig), ...Object.keys(suggestedConfig)])];
+      const comparisonTable = allSectors.map(sector => {
+        const current = currentConfig[sector] || 0;
+        const suggested = suggestedConfig[sector] || 0;
+        const adjustment = suggested - current;
+
+        let type = 'maintain';
+        let typeText = '维持';
+        if (adjustment > 5) {
+          type = 'increase_large';
+          typeText = '大幅增持';
+        } else if (adjustment > 2) {
+          type = 'increase';
+          typeText = '适度增持';
+        } else if (adjustment < -5) {
+          type = 'decrease_large';
+          typeText = '大幅减持';
+        } else if (adjustment < -2) {
+          type = 'decrease';
+          typeText = '适度减持';
+        } else if (current === 0 && suggested > 0) {
+          type = 'new';
+          typeText = '新增';
+        }
+
+        return {
+          sector,
+          current,
+          suggested,
+          adjustment,
+          type,
+          typeText,
+          reason: getAdjustmentReason(sector, adjustment, current)
+        };
+      });
+
+      // 4. 计算HHI指数
+      const calculateHHI = (config) => {
+        const weights = Object.values(config);
+        return weights.reduce((sum, w) => sum + Math.pow(w / 100, 2), 0);
+      };
+
+      const hhiCurrent = calculateHHI(currentConfig);
+      const hhiSuggested = calculateHHI(suggestedConfig);
+
+      // 5. 生成配置说明
+      const configurationNotes = {
+        currentConfig: {
+          description: '基于实际持仓',
+          sectors: Object.keys(currentConfig).length,
+          characteristics: hhiCurrent > 0.15 ? '集中度较高' : '分散度良好'
+        },
+        suggestedConfig: {
+          description: '基于风险分散原则',
+          sectors: Object.keys(suggestedConfig).length,
+          characteristics: hhiSuggested > 0.15 ? '集中度较高' : '分散度良好'
+        },
+        adjustmentPrinciples: [
+          {
+            principle: '降低集中度',
+            measure: '单个板块控制在20%以内',
+            effect: `HHI指数从${hhiCurrent.toFixed(4)}降至${hhiSuggested.toFixed(4)}`
+          },
+          {
+            principle: '风险分散',
+            measure: '增加低相关性板块配置',
+            effect: '降低组合整体波动'
+          },
+          {
+            principle: '动态平衡',
+            measure: '定期调整至目标配置',
+            effect: '维持风险收益平衡'
+          }
+        ]
+      };
+
+      // 6. 生成执行建议
+      const actionItems = generateActionItems(comparisonTable);
+
+      // 7. 计算重大调整数量
+      const majorAdjustments = comparisonTable.filter(item =>
+        Math.abs(item.adjustment) > 5
+      ).length;
+
+      return {
+        meta: {
+          reportDate: new Date().toLocaleDateString('zh-CN'),
+          totalValue: totalValue,
+          currency: 'CNY'
+        },
+        summary: {
+          currentSectors: Object.keys(currentConfig).length,
+          suggestedSectors: Object.keys(suggestedConfig).length,
+          hhiCurrent,
+          hhiSuggested,
+          majorAdjustments,
+          adjustmentTypes: {
+            increase: comparisonTable.filter(item => item.adjustment > 0).length,
+            decrease: comparisonTable.filter(item => item.adjustment < 0).length,
+            new: comparisonTable.filter(item => item.type === 'new').length
+          }
+        },
+        chartData: {
+          xAxis: allSectors,
+          current: allSectors.map(sector => currentConfig[sector] || 0),
+          suggested: allSectors.map(sector => suggestedConfig[sector] || 0)
+        },
+        comparisonTable,
+        configurationNotes,
+        actionItems,
+        signalOverview: {
+          summary: appState.signals,
+          details: [],
+          timeline: {}
+        }
+      };
+    }
+
+    // 生成建议配置（基于风险分散原则）
+    function generateSuggestedConfig(currentConfig) {
+      const suggestedConfig = {};
+      const targetAllocation = {
+        // 目标配置参考（基于投资组合理论）
+        '黄金': 15.0,      // 避险资产，建议15%
+        '半导体/芯片': 10.0, // 高波动，建议10%
+        '碳中和/新能源': 12.0, // 成长性，建议12%
+        '机器人/高端制造': 8.0, // 科技成长，建议8%
+        '纳斯达克/QDII': 10.0, // 海外配置，建议10%
+        '债券/避险': 15.0,   // 稳定资产，建议15%
+        '数字经济': 8.0,     // 科技主题，建议8%
+        '电力公用事业': 5.0,  // 防御性，建议5%
+        '电网设备': 5.0,     // 基建相关，建议5%
+        '资源优选': 5.0,     // 周期性，建议5%
+        '全球优质': 5.0,     // 全球配置，建议5%
+        '稳泰债券': 2.0      // 低风险，建议2%
+      };
+
+      Object.keys(currentConfig).forEach(sector => {
+        const current = currentConfig[sector];
+        const target = targetAllocation[sector] || 5.0; // 默认5%
+
+        // 基于目标配置进行调整
+        if (current > target + 5) {
+          // 高于目标5%以上，大幅减持
+          suggestedConfig[sector] = target;
+        } else if (current > target + 2) {
+          // 高于目标2-5%，适度减持
+          suggestedConfig[sector] = target + 2;
+        } else if (current < target - 5) {
+          // 低于目标5%以上，大幅增持
+          suggestedConfig[sector] = target;
+        } else if (current < target - 2) {
+          // 低于目标2-5%，适度增持
+          suggestedConfig[sector] = target - 2;
+        } else {
+          // 在目标范围内，维持
+          suggestedConfig[sector] = current;
+        }
+      });
+
+      // 归一化到100%
+      const suggestedTotal = Object.values(suggestedConfig).reduce((sum, val) => sum + val, 0);
+      if (suggestedTotal > 0) {
+        Object.keys(suggestedConfig).forEach(sector => {
+          suggestedConfig[sector] = (suggestedConfig[sector] / suggestedTotal) * 100;
         });
       }
-      
-      // 基准对比柱状图
-      const benchEl = document.getElementById('chart-benchmark');
-      if (benchEl && !benchEl._chart) {
-        const chart2 = echarts.init(benchEl, 'dark');
-        benchEl._chart = chart2;
-        const bd = appState.benchmarkData;
-        chart2.setOption({
-          backgroundColor: 'transparent',
-          tooltip: { trigger: 'axis' },
-          xAxis: { type: 'category', data: bd.categories.length ? bd.categories : ['暂无'], axisLabel: { color: '#94a3b8' }, axisLine: { lineStyle: { color: '#334155' } } },
-          yAxis: [
-            { type: 'value', name: '夏普/年化%', axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: '#1e293b' } } },
-          ],
-          series: [
-            { name: '夏普比率', type: 'bar', barWidth: 30, data: bd.sharpe.length ? bd.sharpe : [0], itemStyle: { color: '#3b82f6', borderRadius: [4,4,0,0] } },
-            { name: '年化波动率%', type: 'bar', barWidth: 30, data: bd.volatility.length ? bd.volatility : [0], itemStyle: { color: '#ef4444', borderRadius: [4,4,0,0] } },
-          ],
-          legend: { textStyle: { color: '#94a3b8', fontSize: 11 }, top: 0 }
+
+      // 验证当前配置总和
+      const currentTotal = Object.values(currentConfig).reduce((sum, val) => sum + val, 0);
+      Logger.info('当前配置总和验证', { currentTotal, isApproximately100: Math.abs(currentTotal - 100) < 0.01 });
+
+      // 验证建议配置总和
+      const suggestedTotalAfter = Object.values(suggestedConfig).reduce((sum, val) => sum + val, 0);
+      Logger.info('建议配置总和验证', { suggestedTotalAfter, isApproximately100: Math.abs(suggestedTotalAfter - 100) < 0.01 });
+
+      return suggestedConfig;
+    }
+
+    // 生成执行建议
+    function generateActionItems(comparisonTable) {
+      const actionItems = [];
+
+      // 短期建议（1-2周）
+      const shortTermActions = comparisonTable.filter(item =>
+        Math.abs(item.adjustment) > 5
+      );
+      if (shortTermActions.length > 0) {
+        actionItems.push({
+          timeframe: 'short',
+          label: '短期（1-2周）',
+          action: '调整高偏差板块',
+          description: `优先处理${shortTermActions.length}个偏差超过5%的板块`
+        });
+      } else {
+        actionItems.push({
+          timeframe: 'short',
+          label: '短期（1-2周）',
+          action: '维持当前配置',
+          description: '当前配置偏差较小，暂无需大幅调整'
         });
       }
+
+      // 中期建议（1-3月）
+      const mediumTermActions = comparisonTable.filter(item =>
+        Math.abs(item.adjustment) > 2 && Math.abs(item.adjustment) <= 5
+      );
+      if (mediumTermActions.length > 0) {
+        actionItems.push({
+          timeframe: 'medium',
+          label: '中期（1-3月）',
+          action: '逐步再平衡',
+          description: `逐步调整${mediumTermActions.length}个偏差2-5%的板块`
+        });
+      } else {
+        actionItems.push({
+          timeframe: 'medium',
+          label: '中期（1-3月）',
+          action: '优化配置结构',
+          description: '考虑增加低相关性资产，提升组合稳定性'
+        });
+      }
+
+      // 长期建议（3-6月）
+      actionItems.push({
+        timeframe: 'long',
+        label: '长期（3-6月）',
+        action: '定期检查再平衡',
+        description: '每季度检查配置偏离度，必要时进行再平衡'
+      });
+
+      return actionItems;
+    }
+
+    // 获取调整理由
+    function getAdjustmentReason(sector, adjustment, current) {
+      const reasons = {
+        'increase_large': `当前配置${current.toFixed(1)}%偏低，建议大幅增加配置以提升收益潜力`,
+        'increase': `当前配置${current.toFixed(1)}%略低于目标，建议适度增加`,
+        'decrease_large': `当前配置${current.toFixed(1)}%偏高，建议大幅降低以控制集中度风险`,
+        'decrease': `当前配置${current.toFixed(1)}%略高于目标，建议适度降低`,
+        'new': '新增板块配置，分散投资组合风险',
+        'maintain': '当前配置在目标范围内，维持现有配置'
+      };
+
+      if (adjustment > 5) return reasons['increase_large'];
+      if (adjustment > 2) return reasons['increase'];
+      if (adjustment < -5) return reasons['decrease_large'];
+      if (adjustment < -2) return reasons['decrease'];
+      if (current === 0 && adjustment > 0) return reasons['new'];
+      return reasons['maintain'];
     }
 
     // 初始化应用
@@ -688,11 +1235,35 @@
         appState.newsItems = data.newsItems || appState.newsItems;
         appState.hotStocks = data.hotStocks || appState.hotStocks;
         appState.generatedAt = data.generatedAt || '';
-        
+
+        // 更新分析数据
+        Logger.info('开始更新分析数据');
+        Logger.info('当前holdings数据', { holdings: appState.holdings });
+
+        if (data.analysis) {
+          Logger.info('使用API返回的analysis数据');
+          appState.analysis = { ...appState.analysis, ...data.analysis };
+          Logger.info('分析数据已更新', { analysis: appState.analysis });
+        } else {
+          // 如果没有analysis数据，从现有数据生成
+          Logger.info('从现有holdings数据生成分析数据');
+          const generatedAnalysis = generateAnalysisFromExistingData();
+          Logger.info('生成的分析数据', { analysis: generatedAnalysis });
+          appState.analysis = generatedAnalysis;
+        }
+
+        // 验证分析数据
+        Logger.info('验证分析数据');
+        Logger.info('总市值', { totalValue: appState.analysis.meta.totalValue });
+        Logger.info('当前板块数', { currentSectors: appState.analysis.summary.currentSectors });
+        Logger.info('建议板块数', { suggestedSectors: appState.analysis.summary.suggestedSectors });
+        Logger.info('HHI指数', { hhiCurrent: appState.analysis.summary.hhiCurrent, hhiSuggested: appState.analysis.summary.hhiSuggested });
+        Logger.info('图表数据', { chartData: appState.analysis.chartData });
+
         // 更新最后更新时间
         const updateEl = document.getElementById('last-update');
         if (updateEl) updateEl.textContent = appState.generatedAt;
-        
+
         Logger.info('应用状态已更新');
       } else {
         Logger.warn('数据加载失败，使用默认数据');

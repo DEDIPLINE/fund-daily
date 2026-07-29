@@ -1,0 +1,234 @@
+{
+  "meta": {
+    "reportDate": "2026-07-29",
+    "totalValue": 3600.8,
+    "currency": "CNY"
+  },
+  "summary": {
+    "currentSectors": 10,
+    "suggestedSectors": 10,
+    "hhiCurrent": 0.1474,
+    "hhiSuggested": 0.1,
+    "majorAdjustments": 5,
+    "adjustmentTypes": {
+      "increase": 5,
+      "decrease": 5,
+      "new": 0
+    }
+  },
+  "chartData": {
+    "xAxis": [
+      "黄金",
+      "碳中和/制造",
+      "半导体/芯片",
+      "新能源/汽车",
+      "纳斯达克/QDII",
+      "电网/电力设备",
+      "科技/数字经济",
+      "机器人/高端制造",
+      "债券/避险",
+      "资源/周期"
+    ],
+    "current": [
+      21.9,
+      17.8,
+      16.1,
+      15.0,
+      14.7,
+      5.1,
+      2.3,
+      2.3,
+      2.8,
+      1.9
+    ],
+    "suggested": [
+      10.0,
+      10.0,
+      10.0,
+      10.0,
+      10.0,
+      10.0,
+      10.0,
+      10.0,
+      10.0,
+      10.0
+    ]
+  },
+  "comparisonTable": [
+    {
+      "sector": "黄金",
+      "current": 21.9,
+      "suggested": 10.0,
+      "adjustment": -11.9,
+      "type": "decrease_large",
+      "typeText": "大幅减配",
+      "reason": "当前占比 21.9%，建议降至 10.0% 以降低集中度"
+    },
+    {
+      "sector": "碳中和/制造",
+      "current": 17.8,
+      "suggested": 10.0,
+      "adjustment": -7.8,
+      "type": "decrease_large",
+      "typeText": "大幅减配",
+      "reason": "当前占比 17.8%，建议降至 10.0% 以降低集中度"
+    },
+    {
+      "sector": "半导体/芯片",
+      "current": 16.1,
+      "suggested": 10.0,
+      "adjustment": -6.1,
+      "type": "decrease_large",
+      "typeText": "大幅减配",
+      "reason": "当前占比 16.1%，建议降至 10.0% 以降低集中度"
+    },
+    {
+      "sector": "新能源/汽车",
+      "current": 15.0,
+      "suggested": 10.0,
+      "adjustment": -5.0,
+      "type": "decrease",
+      "typeText": "减配",
+      "reason": "当前占比 15.0%，建议降至 10.0% 以降低集中度"
+    },
+    {
+      "sector": "纳斯达克/QDII",
+      "current": 14.7,
+      "suggested": 10.0,
+      "adjustment": -4.7,
+      "type": "decrease",
+      "typeText": "减配",
+      "reason": "当前占比 14.7%，建议降至 10.0% 以降低集中度"
+    },
+    {
+      "sector": "电网/电力设备",
+      "current": 5.1,
+      "suggested": 10.0,
+      "adjustment": 4.9,
+      "type": "increase",
+      "typeText": "增配",
+      "reason": "当前占比 5.1%，建议升至 10.0% 以均衡配置"
+    },
+    {
+      "sector": "科技/数字经济",
+      "current": 2.3,
+      "suggested": 10.0,
+      "adjustment": 7.7,
+      "type": "increase_large",
+      "typeText": "大幅增配",
+      "reason": "当前占比 2.3%，建议升至 10.0% 以均衡配置"
+    },
+    {
+      "sector": "机器人/高端制造",
+      "current": 2.3,
+      "suggested": 10.0,
+      "adjustment": 7.7,
+      "type": "increase_large",
+      "typeText": "大幅增配",
+      "reason": "当前占比 2.3%，建议升至 10.0% 以均衡配置"
+    },
+    {
+      "sector": "债券/避险",
+      "current": 2.8,
+      "suggested": 10.0,
+      "adjustment": 7.2,
+      "type": "increase_large",
+      "typeText": "大幅增配",
+      "reason": "当前占比 2.8%，建议升至 10.0% 以均衡配置"
+    },
+    {
+      "sector": "资源/周期",
+      "current": 1.9,
+      "suggested": 10.0,
+      "adjustment": 8.1,
+      "type": "increase_large",
+      "typeText": "大幅增配",
+      "reason": "当前占比 1.9%，建议升至 10.0% 以均衡配置"
+    }
+  ],
+  "configurationNotes": {
+    "currentConfig": {
+      "description": "基于实际持仓，偏重 黄金、碳中和/制造、半导体/芯片",
+      "sectors": 10,
+      "characteristics": "集中度 HHI=0.1474，合理"
+    },
+    "suggestedConfig": {
+      "description": "基于分散化原则，单板块不超过 18%",
+      "sectors": 10,
+      "characteristics": "建议 HHI=0.1000，风险分散优化"
+    },
+    "adjustmentPrinciples": [
+      {
+        "principle": "降低集中度",
+        "measure": "减配高占比板块至 18% 以下",
+        "effect": "HHI 从 0.1474 降至 0.1000"
+      },
+      {
+        "principle": "减少假分散",
+        "measure": "关注高相关性基金对，避免重复敞口",
+        "effect": "降低组合整体风险"
+      }
+    ]
+  },
+  "actionItems": [
+    {
+      "label": "减配建议",
+      "action": "减配 黄金",
+      "description": "黄金 当前占比 21.9%，建议降至 10.0%",
+      "timeframe": "short"
+    },
+    {
+      "label": "减配建议",
+      "action": "减配 碳中和/制造",
+      "description": "碳中和/制造 当前占比 17.8%，建议降至 10.0%",
+      "timeframe": "short"
+    },
+    {
+      "label": "减配建议",
+      "action": "减配 半导体/芯片",
+      "description": "半导体/芯片 当前占比 16.1%，建议降至 10.0%",
+      "timeframe": "short"
+    },
+    {
+      "label": "减配建议",
+      "action": "减配 新能源/汽车",
+      "description": "新能源/汽车 当前占比 15.0%，建议降至 10.0%",
+      "timeframe": "medium"
+    },
+    {
+      "label": "减配建议",
+      "action": "减配 纳斯达克/QDII",
+      "description": "纳斯达克/QDII 当前占比 14.7%，建议降至 10.0%",
+      "timeframe": "medium"
+    },
+    {
+      "label": "增配建议",
+      "action": "增配 电网/电力设备",
+      "description": "电网/电力设备 当前占比 5.1%，建议升至 10.0%",
+      "timeframe": "long"
+    }
+  ],
+  "signalOverview": {
+    "summary": {
+      "highCorrelation": 3,
+      "totalFunds": 12
+    },
+    "details": [
+      {
+        "fund1": "鹏华碳中和主题混合C",
+        "fund2": "南方中证机器人ETF联接A",
+        "correlation": 0.853
+      },
+      {
+        "fund1": "汇添富中证芯片产业指数增强C",
+        "fund2": "大摩数字经济混合A",
+        "correlation": 0.751
+      },
+      {
+        "fund1": "国泰A股电网设备ETF联接A",
+        "fund2": "大摩数字经济混合A",
+        "correlation": 0.702
+      }
+    ]
+  }
+}

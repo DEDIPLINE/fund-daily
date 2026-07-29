@@ -1,0 +1,138 @@
+{
+  "meta": {
+    "owner": "用户",
+    "platform": "支付宝",
+    "currency": "CNY",
+    "snapshot_date": "2026-07-20",
+    "note": "持仓金额为该日期的市值(元)。数据来自用户截图，需手动维护。QDII基金净值通常有1-2个交易日滞后。"
+  },
+  "signals": {
+    "valuation_window": 252,
+    "valuation_high": 80,
+    "valuation_low": 20,
+    "take_profit_baseline": "2025-07-20",
+    "take_profit_tiers": [15, 20, 25],
+    "anomaly_drop_pct": 3.0,
+    "anomaly_consecutive_down": 3,
+    "note": "方案B口径：未提供真实成本，止盈用近1年涨幅(基准2025-07-20)近似。改 valuation_high/low 调红绿灯灵敏度；改 take_profit_tiers 调止盈档；改 take_profit_baseline 可改为特定日期或提供成本后切方案A。"
+  },
+  "diagnostics": {
+    "rf": 0.015,
+    "single_limit": 25.0,
+    "bucket_limit": 40.0,
+    "hhi_limit": 0.15,
+    "corr_limit": 0.70,
+    "benchmark": ["000300", "000012"],
+    "benchmark_names": {"000300": "沪深300", "000012": "上证国债指数"},
+    "note": "Phase4 持仓诊断阈值：单只>25%/风险桶>40%/HHI>0.15/相关性>0.70 触发提示。基准对比沪深300(宽基)与上证国债指数(防御)。无风险利率按10年期国债约1.5%。"
+  },
+  "news": {
+    "use_mcp": true,
+    "hot_stocks_count": 5,
+    "news_per_stock": 5,
+    "research_days": 7,
+    "fund_announcement_days": 7,
+    "macro_keywords": ["黄金", "白银", "原油", "美元", "人民币", "PMI", "GDP", "CPI", "降息", "加息", "利率", "LPR"],
+    "note": "use_mcp: true=优先用腾讯自选股MCP缓存(需WorkBuddy环境预生成), false=纯akshare; hot_stocks_count: 市场热点区取非持仓关联的雪球热度Top几只; news_per_stock: 每只关联股票拉几条新闻; research_days: 研报取近几天; macro_keywords: 宏观日历过滤关键词"
+  },
+  "theme_map": {
+    "014194": {"stocks": ["688981", "688256"], "stock_names": ["中芯国际", "寒武纪"], "keywords": ["芯片", "半导体", "IC", "晶圆"], "note": "芯片指增→半导体龙头"},
+    "016531": {"stocks": ["300750", "601012"], "stock_names": ["宁德时代", "隆基绿能"], "keywords": ["碳中和", "新能源", "光伏", "储能", "锂电"], "note": "碳中和混合→新能源+光伏"},
+    "000218": {"stocks": ["601899", "600547"], "stock_names": ["紫金矿业", "山东黄金"], "keywords": ["黄金", "贵金属", "金价"], "note": "黄金ETF联接→黄金龙头"},
+    "400015": {"stocks": ["300750", "002594"], "stock_names": ["宁德时代", "比亚迪"], "keywords": ["新能源车", "电池", "充电桩"], "note": "新能源混合→电池+新能源车"},
+    "270042": {"stocks": [], "stock_names": [], "keywords": ["纳斯达克", "美股", "美债", "美联储"], "note": "纳指QDII→宏观+美股"},
+    "018229": {"stocks": [], "stock_names": [], "keywords": ["全球", "QDII", "美股", "港股"], "note": "全球优质QDII→宏观"},
+    "017102": {"stocks": ["300474", "002415"], "stock_names": ["景嘉微", "海康威视"], "keywords": ["数字经济", "AI", "人工智能", "算力"], "note": "数字经济→AI/算力"},
+    "020607": {"stocks": ["300124", "002747"], "stock_names": ["汇川技术", "埃斯顿"], "keywords": ["机器人", "工业机器人", "人形机器人", "自动化"], "note": "机器人ETF联接→机器人龙头"},
+    "023638": {"stocks": ["600406", "601179"], "stock_names": ["国电南瑞", "中国西电"], "keywords": ["电网", "电力设备", "特高压"], "note": "电网设备→电力设备龙头"},
+    "016185": {"stocks": ["600900", "600886"], "stock_names": ["长江电力", "国投电力"], "keywords": ["电力", "公用事业", "水电"], "note": "电力公用→水电/火电龙头"},
+    "008173": {"stocks": [], "stock_names": [], "keywords": ["债券", "利率", "央行"], "note": "债券→宏观利率"},
+    "240022": {"stocks": ["601899", "600362"], "stock_names": ["紫金矿业", "江西铜业"], "keywords": ["资源", "有色金属", "铜", "锂", "煤炭"], "note": "资源优选→有色/资源"}
+  },
+  "holdings": [
+    {
+      "code": "014194",
+      "name": "汇添富中证芯片产业指数增强C",
+      "type": "股票型-行业指增",
+      "category": "半导体/芯片",
+      "amount": 986.63
+    },
+    {
+      "code": "016531",
+      "name": "鹏华碳中和主题混合C",
+      "type": "混合型-偏股",
+      "category": "碳中和/制造",
+      "amount": 886.02
+    },
+    {
+      "code": "000218",
+      "name": "国泰黄金ETF联接A",
+      "type": "黄金",
+      "category": "黄金",
+      "amount": 759.44
+    },
+    {
+      "code": "400015",
+      "name": "东方新能源汽车主题混合",
+      "type": "混合型-偏股",
+      "category": "新能源/汽车",
+      "amount": 714.95
+    },
+    {
+      "code": "270042",
+      "name": "广发纳斯达克100ETF联接(QDII)A",
+      "type": "QDII-股票",
+      "category": "纳斯达克/QDII",
+      "amount": 430.71
+    },
+    {
+      "code": "018229",
+      "name": "易方达全球优质企业混合(QDII)A",
+      "type": "QDII-混合",
+      "category": "纳斯达克/QDII",
+      "amount": 88.16
+    },
+    {
+      "code": "017102",
+      "name": "大摩数字经济混合A",
+      "type": "混合型-偏股",
+      "category": "科技/数字经济",
+      "amount": 84.88
+    },
+    {
+      "code": "020607",
+      "name": "南方中证机器人ETF联接A",
+      "type": "股票型-行业指数",
+      "category": "机器人/高端制造",
+      "amount": 82.07
+    },
+    {
+      "code": "023638",
+      "name": "国泰A股电网设备ETF联接A",
+      "type": "股票型-行业指数",
+      "category": "电网/电力设备",
+      "amount": 78.34
+    },
+    {
+      "code": "016185",
+      "name": "广发电力公用事业ETF联接A",
+      "type": "股票型-行业指数",
+      "category": "电网/电力设备",
+      "amount": 103.59
+    },
+    {
+      "code": "008173",
+      "name": "兴全稳泰债券C",
+      "type": "债券型-中长债",
+      "category": "债券/避险",
+      "amount": 101.92
+    },
+    {
+      "code": "240022",
+      "name": "华宝资源优选混合A",
+      "type": "混合型-偏股",
+      "category": "资源/周期",
+      "amount": 65.88
+    }
+  ]
+}
